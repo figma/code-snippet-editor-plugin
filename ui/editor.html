@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Code Snippet Editor</title>
+    <style>
+      :root {
+        --button-di: 32px;
+        --font-size: 11px;
+        --line-height: 16px;
+      }
+      body {
+        background: var(--figma-color-bg);
+        color: var(--figma-color-text);
+        margin: 0;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      select {
+        all: unset;
+      }
+      h1 {
+        align-items: center;
+        background: var(--figma-color-bg);
+        border-bottom: 1px solid var(--figma-color-border);
+        display: flex;
+        font-family: Inter, sans-serif;
+        font-size: var(--font-size);
+        justify-content: space-between;
+        left: 0;
+        margin: 0;
+        padding: 0.5rem 0.5rem;
+        position: fixed;
+        top: 0;
+        width: 100%;
+      }
+      button {
+        align-items: center;
+        appearance: none;
+        background: var(--figma-color-bg);
+        border: none;
+        color: var(--figma-color-text);
+        cursor: pointer;
+        display: flex;
+        fill: var(--figma-color-icon);
+        height: var(--button-di);
+        justify-content: center;
+        padding: 0;
+        width: var(--button-di);
+      }
+      button:hover {
+        background-color: var(--figma-color-bg-hover);
+      }
+      h1 button {
+        color: var(--figma-color-text-onbrand);
+        background-color: var(--figma-color-bg-brand);
+        fill: var(--figma-color-icon-onbrand);
+      }
+      h1 button:hover {
+        background-color: var(--figma-color-bg-brand-hover);
+      }
+      main {
+        display: flex;
+        flex-direction: column;
+        padding-top: 50px;
+      }
+      article {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        padding: 0.5rem;
+      }
+      article + article {
+        border-top: 1px solid var(--figma-color-border);
+      }
+      article > * {
+        display: block;
+        width: 100%;
+      }
+      div {
+        display: flex;
+        gap: 0.5rem;
+      }
+      div > input {
+        flex: 1;
+      }
+      textarea {
+        font: 400 var(--font-size) / var(--line-height) Andale Mono, Roboto Mono,
+          monospace;
+        min-height: 10vh;
+        text-wrap: nowrap;
+      }
+      textarea,
+      input,
+      button,
+      select {
+        border-radius: 2px;
+      }
+      input,
+      button,
+      select {
+        font-family: Inter, sans-serif;
+        font-size: var(--font-size);
+        line-height: var(--line-height);
+      }
+      input,
+      textarea {
+        background: var(--figma-color-bg-secondary);
+        border: none;
+      }
+      select {
+        background: transparent;
+        border: 1px solid transparent;
+      }
+      .select {
+        display: flex;
+        position: relative;
+      }
+      .select svg {
+        fill: var(--figma-color-icon);
+        position: absolute;
+        right: 0.5rem;
+        top: 50%;
+        transform: translateY(-50%);
+      }
+      .select select {
+        padding: 0.5rem 1.5rem 0.5rem 0.25rem;
+      }
+      select:hover {
+        border-color: var(--figma-color-border);
+      }
+      input,
+      textarea,
+      select {
+        color: var(--figma-color-text);
+        padding: 0.25rem;
+      }
+      button:focus-visible,
+      input:focus-visible,
+      textarea:focus-visible,
+      select:focus-visible {
+        box-shadow: 0 0 0 2px var(--figma-color-border-selected);
+        outline: none;
+      }
+      input {
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <main></main>
+    <script>
+      const LANGUAGES = [
+        "BASH",
+        "CPP",
+        "CSS",
+        "GO",
+        "GRAPHQL",
+        "HTML",
+        "JAVASCRIPT",
+        "JSON",
+        "KOTLIN",
+        "PLAINTEXT",
+        "PYTHON",
+        "RUBY",
+        "RUST",
+        "SQL",
+        "SWIFT",
+        "TYPESCRIPT",
+      ];
+      const LANGUAGES_LABEL = [
+        "Bash",
+        "C++",
+        "CSS",
+        "Go",
+        "GraphQL",
+        "HTML",
+        "JavaScript",
+        "JSON",
+        "Kotlin",
+        "Plain Text",
+        "Python",
+        "Ruby",
+        "Rust",
+        "SQL",
+        "Swift",
+        "TypeScript",
+      ];
+      const LANGUAGE_OPTIONS = LANGUAGES.map(
+        (l, i) => `<option value="${l}">${LANGUAGES_LABEL[i]}</option>`
+      ).join("");
+      const main = document.querySelector("main");
+
+      let snippetList = [];
+      let currentNodeType;
+
+      parent.postMessage({ pluginMessage: { type: "INITIALIZE" } }, "*");
+      window.onmessage = (e) => {
+        const data = e.data.pluginMessage;
+        if (data.type === "SELECTION") {
+          handleSelectionChange(data);
+        } else {
+          console.log(data);
+        }
+      };
+
+      function handleSelectionChange({ nodeId, nodePluginData, nodeType }) {
+        currentNodeType = nodeType;
+        if (nodeId) {
+          snippetList = nodePluginData
+            ? JSON.parse(nodePluginData).map(itemFromData)
+            : [];
+          render();
+        } else {
+          console.log("No nodes selected. Shouldn't happen in settings mode.");
+        }
+      }
+
+      function render() {
+        main.innerHTML = "";
+        const h1 = document.createElement("h1");
+        h1.innerHTML = `Snippets for ${currentNodeType}`;
+        const addButton = document.createElement("button");
+        addButton.addEventListener("click", () => {
+          snippetList.push(itemFromData(undefined, snippetList.length));
+          render();
+        });
+        addButton.innerHTML = `<svg class="svg" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12"><path fill-opacity="1" fill-rule="nonzero" stroke="none" d="M5.5 5.5v-5h1v5h5v1h-5v5h-1v-5h-5v-1h5z"></path></svg>`;
+        h1.appendChild(addButton);
+        main.appendChild(h1);
+
+        if (!snippetList.length) {
+          snippetList.push(itemFromData(undefined, 0));
+        }
+
+        snippetList.forEach(({ article }) => main.appendChild(article));
+      }
+
+      function onChange(event) {
+        if (event && event.target.tagName === "TEXTAREA") {
+          resizeTextarea(event.target);
+        }
+        const data = snippetList
+          .filter((a) => Boolean(a.textarea.value))
+          .map(({ textarea, select, input }) => ({
+            language: select.value,
+            code: textarea.value,
+            title: input.value,
+          }));
+        parent.postMessage(
+          { pluginMessage: { type: "SAVE", data: JSON.stringify(data) } },
+          "*"
+        );
+      }
+
+      function itemFromData(
+        { language, code, title } = {
+          language: "PLAINTEXT",
+          code: "",
+          title: "New Snippet",
+        },
+        index
+      ) {
+        const article = document.createElement("article");
+        const textarea = document.createElement("textarea");
+        const select = document.createElement("select");
+        const selectLabel = document.createElement("label");
+        selectLabel.className = "select";
+        select.id = `select-${index}`;
+        selectLabel.innerHTML = `<svg width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M1.87451 4.46785L2.58162 3.76074L5.99995 7.17908L9.41829 3.76074L10.1254 4.46785L5.99995 8.59329L1.87451 4.46785Z" /></svg>`;
+        selectLabel.setAttribute("for", select.id);
+        selectLabel.appendChild(select);
+        const input = document.createElement("input");
+        const remove = document.createElement("button");
+        remove.addEventListener("click", () => {
+          if (window.confirm("Are you sure you want to remove this snippet?")) {
+            snippetList.splice(index, 1);
+            onChange();
+            render();
+          }
+        });
+        input.addEventListener("input", onChange);
+        select.addEventListener("change", onChange);
+        textarea.addEventListener("input", onChange);
+        remove.innerHTML = `<svg class="svg" width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg"><path d="M5.99996 5.29286L9.5355 1.75732L10.2426 2.46443L6.70707 5.99996L10.2426 9.5355L9.5355 10.2426L5.99996 6.70707L2.46443 10.2426L1.75732 9.5355L5.29286 5.99996L1.75732 2.46443L2.46443 1.75732L5.99996 5.29286Z"/></svg>`;
+        select.innerHTML = LANGUAGE_OPTIONS;
+        input.value = title;
+        select.value = language;
+        textarea.value = code;
+        setTimeout(() => resizeTextarea(textarea), 0);
+        const div = document.createElement("div");
+        div.appendChild(input);
+        div.appendChild(selectLabel);
+        div.appendChild(remove);
+        article.appendChild(div);
+        article.appendChild(textarea);
+        return { textarea, select, input, article };
+      }
+
+      function resizeTextarea(textarea) {
+        textarea.style.height = "auto";
+        textarea.style.height = `${textarea.scrollHeight + 2}px`;
+      }
+    </script>
+  </body>
+</html>

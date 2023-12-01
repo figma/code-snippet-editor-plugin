@@ -1,0 +1,40 @@
+{
+  "name": "Code Snippet Editor",
+  "id": "1311777988952403297",
+  "api": "1.0.0",
+  "editorType": ["dev", "figma"],
+  "capabilities": ["codegen"],
+  "permissions": [],
+  "codegenLanguages": [{ "label": "Snippets", "value": "snippets" }],
+  "codegenPreferences": [
+    {
+      "itemType": "action",
+      "propertyName": "editor",
+      "label": "Open Editor"
+    },
+    {
+      "itemType": "select",
+      "propertyName": "defaultSnippet",
+      "label": "Default snippet",
+      "options": [
+        { "label": "Message", "value": "message", "isDefault": true },
+        { "label": "Empty", "value": "empty" }
+      ]
+    },
+    {
+      "itemType": "select",
+      "propertyName": "detailsMode",
+      "label": "Details mode",
+      "options": [
+        { "label": "On", "value": "on" },
+        { "label": "Off", "value": "off", "isDefault": true }
+      ]
+    }
+  ],
+  "main": "code.js",
+  "ui": {
+    "bulk": "ui/bulk.html",
+    "editor": "ui/editor.html"
+  },
+  "networkAccess": { "allowedDomains": ["none"] }
+}
