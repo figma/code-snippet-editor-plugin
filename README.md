@@ -18,12 +18,12 @@ Translate component variants, properties, and more into dynamic code snippets fo
 - [Filters](#filters)
 - [“Details mode”](#details-mode)
 - [Bulk Operations](#bulk-operations)
-  - [Import/Export](#import-export)
+  - [Import/Export](#importexport)
   - [Component Data](#component-data)
   - [Node Params](#node-params)
 - [Full Examples](#full-examples)
   - [React](#react)
-  - [HTML/CSS](#html-css)
+  - [HTML/CSS](#htmlcss)
 - [WIP](#wip)
 
 ## Overview
