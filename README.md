@@ -115,21 +115,17 @@ Only render the value of `property` if it is not `"value"`.
 Multiple lines in a snippet template can be rendered as a single line (e.g., a list of CSS class names). The following would render `hello world`.
 
 ```
-
 hello\
 world
-
 ```
 
 Single line syntax creates scenarios with trailing and leading spaces that may not be desirable. For example...
 
 ```
-
 "\
 hello\
 world\
 "
-
 ```
 
 ...renders as `" hello world "` with an extra space at the beginning and end.
@@ -137,12 +133,10 @@ world\
 To remove a leading or trailing space, you can prefix or suffix an extra `\`.
 
 ```
-
 "\\
 hello\
 world\
 \"
-
 ```
 
 This would yield `"hello world"` due to the extra trailing slash on line one and leading slash on line four.
