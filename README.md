@@ -413,7 +413,7 @@ The following template...
 </Button>
 ```
 
-### HTML / CSS
+### HTML/CSS
 
 The following template...
 
