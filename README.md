@@ -476,7 +476,6 @@ button\
   - Still trying to think of the best place to store/access those templates.
   - Saving on page node might work for some, but a global solution might be better.
 - A string remove filter that allows you to take a substring out of a name
-- Variants as instance swaps -> component set name instead of main component name
 - Make instance swap properties' instance node's data available (eg. `<Thing icon={<IconHeart size="sm" />} />`)
 - Add `styles` params namespace for fills and typography
 - Editor with live preview mode.

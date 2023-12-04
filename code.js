@@ -325,9 +325,11 @@ async function paramsFromNode(node) {
         if (type === "TEXT") object[cleanName].TEXT = value;
         if (type === "INSTANCE_SWAP") {
           const foundNode = await figma.getNodeById(value);
-          object[cleanName].INSTANCE_SWAP = foundNode
-            ? foundNode.name || ""
-            : "";
+          const nodeName =
+            foundNode && foundNode.parent.type === "COMPONENT_SET"
+              ? foundNode.parent.name
+              : foundNode.name;
+          object[cleanName].INSTANCE_SWAP = nodeName || "";
         }
       } else {
         object[cleanName].BOOLEAN = value;
