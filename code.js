@@ -306,12 +306,13 @@ function lineQualifierMatch(line, params) {
   return [matches, valid];
 }
 
-async function paramsFromNode(node) {
+async function paramsFromNode(node, propertiesOnly = false) {
   const valueObject = valueObjectFromNode(node);
   const object = {};
   const isDefinitions =
     valueObject[Object.keys(valueObject)[0]] &&
     "defaultValue" in valueObject[Object.keys(valueObject)[0]];
+  const instanceProperties = {};
   for (let propertyName in valueObject) {
     const value = isDefinitions
       ? valueObject[propertyName].defaultValue
@@ -330,6 +331,7 @@ async function paramsFromNode(node) {
               ? foundNode.parent.name
               : foundNode.name;
           object[cleanName].INSTANCE_SWAP = nodeName || "";
+          instanceProperties[cleanName] = await paramsFromNode(foundNode, true);
         }
       } else {
         object[cleanName].BOOLEAN = value;
@@ -354,12 +356,27 @@ async function paramsFromNode(node) {
       params[`property.${key}`] = splitString(value);
       raw[`property.${key}`] = value;
     }
+    if (itemKeys.includes("INSTANCE_SWAP") && instanceProperties[key]) {
+      const keyPrefix =
+        itemKeys.length > 1 ? `property.${key}.i` : `property.${key}`;
+      for (let k in instanceProperties[key].params) {
+        params[`${keyPrefix}.${k}`] = splitString(
+          instanceProperties[key].params[k]
+        );
+        raw[`${keyPrefix}.${k}`] = instanceProperties[key].raw[k];
+      }
+    }
   }
 
-  return {
-    params: Object.assign(params, initial.params),
-    raw: Object.assign(raw, initial.raw),
-  };
+  return propertiesOnly
+    ? {
+        params,
+        raw,
+      }
+    : {
+        params: Object.assign(params, initial.params),
+        raw: Object.assign(raw, initial.raw),
+      };
 }
 
 async function initialParamsFromNode(node) {
@@ -423,8 +440,10 @@ async function initialParamsFromNode(node) {
     ];
     props.forEach((p) => {
       const val = autolayout[p] + "";
-      raw[`autolayout.${p}`] = val;
-      params[`autolayout.${p}`] = splitString(val);
+      if (val !== "undefined" && val !== "null") {
+        raw[`autolayout.${p}`] = val;
+        params[`autolayout.${p}`] = splitString(val);
+      }
     });
   }
   return { params, raw };
