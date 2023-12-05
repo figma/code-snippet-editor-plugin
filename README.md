@@ -472,12 +472,3 @@ button\
   Hello World!
 </button>
 ```
-
-## WIP
-
-- For the non-component node types, it would be nice to have a default template to render rather than storing a templates on individual nodes.
-  - Still trying to think of the best place to store/access those templates.
-  - Saving on page node might work for some, but a global solution might be better.
-- A string remove filter that allows you to take a substring out of a name
-- Add `styles` params namespace for fills and typography
-- Editor with live preview mode.
