@@ -37,7 +37,7 @@ You can add code snippets using the Snippet Editor, which is accessible from the
 ![Screenshot 2023-12-04 at 10 14 46 PM](https://github.com/figma/code-snippet-editor-plugin/assets/57682038/5883b5bb-f97e-436d-b6ac-d0c4f2d410fd)
 
 
-Any snippets added to a Component or ComponentSet will also be propogated to any Instances.
+Any snippets added to a Component or ComponentSet will also be propagated to any Instances.
 
 Snippets can either be static or utilize the snippet templating language, which is detailed below.
 
