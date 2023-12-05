@@ -327,7 +327,9 @@ async function paramsFromNode(node, propertiesOnly = false) {
         if (type === "INSTANCE_SWAP") {
           const foundNode = await figma.getNodeById(value);
           const nodeName =
-            foundNode && foundNode.parent.type === "COMPONENT_SET"
+            foundNode &&
+            foundNode.parent &&
+            foundNode.parent.type === "COMPONENT_SET"
               ? foundNode.parent.name
               : foundNode.name;
           object[cleanName].INSTANCE_SWAP = nodeName || "";
@@ -453,7 +455,7 @@ async function initialParamsFromNode(node) {
 
 function getComponentNodeFromNode(node) {
   const { type, parent } = node;
-  const parentType = parent.type;
+  const parentType = parent ? parent.type : "";
   const isVariant = parentType === "COMPONENT_SET";
   if (type === "COMPONENT_SET" || (type === "COMPONENT" && !isVariant)) {
     return node;
@@ -506,7 +508,7 @@ function valueObjectFromNode(node) {
   if (node.type === "INSTANCE") return node.componentProperties;
   if (node.type === "COMPONENT_SET") return node.componentPropertyDefinitions;
   if (node.type === "COMPONENT") {
-    if (node.parent.type === "COMPONENT_SET") {
+    if (node.parent && node.parent.type === "COMPONENT_SET") {
       const initialProps = Object.assign(
         {},
         node.parent.componentPropertyDefinitions
