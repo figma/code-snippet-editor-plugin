@@ -437,6 +437,8 @@ async function initialParamsFromNode(node) {
       "paddingBottom",
       "itemSpacing",
       "counterAxisSpacing",
+      "primaryAxisAlignItems",
+      "counterAxisAlignItems",
     ];
     props.forEach((p) => {
       const val = autolayout[p] + "";

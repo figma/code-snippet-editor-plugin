@@ -153,7 +153,20 @@ The values you can refer to in symbols and qualifiers are called "params". These
 ### `autolayout`
 
 The detected [`InferredAutoLayout`](https://www.figma.com/plugin-docs/api/InferredAutoLayoutResult/) properties. Currently limited to
-[`layoutMode`](https://www.figma.com/plugin-docs/api/InferredAutoLayoutResult/#layoutmode), [`layoutWrap`](https://www.figma.com/plugin-docs/api/InferredAutoLayoutResult/#layoutwrap), [`paddingLeft`](https://www.figma.com/plugin-docs/api/InferredAutoLayoutResult/#paddingleft), [`paddingRight`](https://www.figma.com/plugin-docs/api/InferredAutoLayoutResult/#paddingright), [`paddingTop`](https://www.figma.com/plugin-docs/api/InferredAutoLayoutResult/#paddingtop), [`paddingBottom`](https://www.figma.com/plugin-docs/api/InferredAutoLayoutResult/#paddingbottom), [`itemSpacing`](https://www.figma.com/plugin-docs/api/InferredAutoLayoutResult/#itemspacing) and [`counterAxisSpacing`](https://www.figma.com/plugin-docs/api/InferredAutoLayoutResult/#counteraxisspacing)
+[`layoutMode`](https://www.figma.com/plugin-docs/api/InferredAutoLayoutResult/#layoutmode), [`layoutWrap`](https://www.figma.com/plugin-docs/api/InferredAutoLayoutResult/#layoutwrap), [`paddingLeft`](https://www.figma.com/plugin-docs/api/InferredAutoLayoutResult/#paddingleft), [`paddingRight`](https://www.figma.com/plugin-docs/api/InferredAutoLayoutResult/#paddingright), [`paddingTop`](https://www.figma.com/plugin-docs/api/InferredAutoLayoutResult/#paddingtop), [`paddingBottom`](https://www.figma.com/plugin-docs/api/InferredAutoLayoutResult/#paddingbottom), [`itemSpacing`](https://www.figma.com/plugin-docs/api/InferredAutoLayoutResult/#itemspacing), [`counterAxisSpacing`](https://www.figma.com/plugin-docs/api/InferredAutoLayoutResult/#counteraxisspacing), [`primaryAxisAlignItems`](https://www.figma.com/plugin-docs/api/InferredAutoLayoutResult/#primaryaxisalignitems), and [`counterAxisAlignItems`](https://www.figma.com/plugin-docs/api/InferredAutoLayoutResult/#counteraxisalignitems)
+
+```json
+{
+  "autolayout.layoutMode": "vertical",
+  "autolayout.paddingLeft": "10",
+  "autolayout.paddingRight": "10",
+  "autolayout.paddingTop": "20",
+  "autolayout.paddingBottom": "20",
+  "autolayout.itemSpacing": "10",
+  "autolayout.primaryAxisAlignItems": "center",
+  "autolayout.counterAxisAlignItems": "center"
+}
+```
 
 ### `component`
 
