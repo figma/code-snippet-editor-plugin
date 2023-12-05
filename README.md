@@ -28,13 +28,16 @@ Translate component variants, properties, and more into dynamic code snippets fo
 
 ## Overview
 
-This plugin allows you to write code snippets for nodes that are rendered in inspect panel code generation. You can make these snippets dynamic by referring to params provided by the plugin. Doing this for your component library will bring accurate code snippets to any project that incorporates your design system.
+This plugin allows you to write and generate code snippets for Figma nodes, which are rendered in the Inspect Panel in [Dev Mode](https://help.figma.com/hc/en-us/articles/15023124644247-Guide-to-Dev-Mode). You can make these code snippets dynamic, by referring to parameters provided by the plugin. Doing this for your component library will bring accurate code snippets to any project that incorporates your design system.
 
 Code snippets are saved in [shared plugin data](https://www.figma.com/plugin-docs/api/properties/nodes-setsharedplugindata/) using the keys `node.getSharedPluginData("codesnippets", "snippets")`. A benefit of shared plugin data is that any plugin can make use of or update these snippets.
 
-You can append snippets to nodes using the Snippet Editor, which is accessible in the settings menu of the codegen plugin.
+You can add code snippets using the Snippet Editor, which is accessible from the settings menu of the plugin in Dev Mode's Inspect Panel:
 
-Any snippets tied to a Component or ComponentSet will also be rendered when viewing their Instances.
+![Screenshot 2023-12-04 at 10 14 46 PM](https://github.com/figma/code-snippet-editor-plugin/assets/57682038/5883b5bb-f97e-436d-b6ac-d0c4f2d410fd)
+
+
+Any snippets added to a Component or ComponentSet will also be propogated to any Instances.
 
 Snippets can either be static or utilize the snippet templating language, which is detailed below.
 
