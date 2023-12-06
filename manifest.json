@@ -3,7 +3,7 @@
   "id": "1311777988952403297",
   "api": "1.0.0",
   "editorType": ["dev", "figma"],
-  "capabilities": ["codegen"],
+  "capabilities": ["codegen", "vscode"],
   "permissions": [],
   "codegenLanguages": [{ "label": "Snippets", "value": "snippets" }],
   "codegenPreferences": [

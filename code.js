@@ -6,9 +6,18 @@ if (figma.mode === "codegen") {
 
   figma.codegen.on("preferenceschange", async (event) => {
     if (event.propertyName === "editor") {
+      const { x, y, width, height } = figma.viewport.bounds;
+      const absWidth = width * figma.viewport.zoom;
+      const absHeight = height * figma.viewport.zoom;
+      const finalWidth = Math.round(
+        Math.max(Math.min(absWidth, 300), Math.min(absWidth * 0.5, 600))
+      );
+      const finalHeight = Math.round(Math.min(absHeight, 600));
+      const realX = x + Math.round(absWidth - finalWidth);
       figma.showUI(__uiFiles__.editor, {
-        width: 600,
-        height: 600,
+        position: { x: realX, y },
+        width: finalWidth,
+        height: finalHeight,
         themeColors: true,
       });
     }
@@ -31,45 +40,51 @@ if (figma.mode === "codegen") {
   figma.on("selectionchange", () => handleCurrentSelection);
 
   figma.codegen.on("generate", async (event) => {
-    const currentNode = handleCurrentSelection();
-    const { params, raw } = await paramsFromNode(currentNode);
-    const { detailsMode, defaultSnippet } =
-      figma.codegen.preferences.customSettings;
-    const isDetailsMode = detailsMode === "on";
-    const hasDefaultMessage = defaultSnippet === "message";
+    try {
+      const currentNode = handleCurrentSelection();
+      const { params, raw } = await paramsFromNode(currentNode);
+      const { detailsMode, defaultSnippet } =
+        figma.codegen.preferences.customSettings;
+      const isDetailsMode = detailsMode === "on";
+      const hasDefaultMessage = defaultSnippet === "message";
 
-    const snippetData = await findAndGenerateSelectionSnippetData(
-      currentNode,
-      params,
-      raw
-    );
+      const snippetData = await findAndGenerateSelectionSnippetData(
+        currentNode,
+        params,
+        raw
+      );
 
-    const snippets = snippetsFromSnippetData(snippetData, isDetailsMode);
+      const snippets = snippetsFromSnippetData(snippetData, isDetailsMode);
 
-    if (isDetailsMode) {
-      snippets.push({
-        title: "Node Params",
-        code: JSON.stringify(params, null, 2),
-        language: "JSON",
-      });
-      snippets.push({
-        title: "Node Params (Raw)",
-        code: JSON.stringify(raw, null, 2),
-        language: "JSON",
-      });
-    }
-
-    if (!snippets.length) {
-      if (hasDefaultMessage) {
+      if (isDetailsMode) {
         snippets.push({
-          title: "Snippets",
-          code: "No snippets on this node. Add snippets via the Snippet Editor.",
-          language: "PLAINTEXT",
+          title: "Node Params",
+          code: JSON.stringify(params, null, 2),
+          language: "JSON",
+        });
+        snippets.push({
+          title: "Node Params (Raw)",
+          code: JSON.stringify(raw, null, 2),
+          language: "JSON",
         });
       }
-    }
 
-    return snippets;
+      if (!snippets.length) {
+        if (hasDefaultMessage) {
+          snippets.push({
+            title: "Snippets",
+            code: "No snippets on this node. Add snippets via the Snippet Editor.",
+            language: "PLAINTEXT",
+          });
+        }
+      }
+
+      return snippets;
+    } catch (e) {
+      return [
+        { language: "JSON", code: JSON.stringify(e, null, 2), title: "Error" },
+      ];
+    }
   });
 } else {
   figma.ui.on("message", async (event) => {
