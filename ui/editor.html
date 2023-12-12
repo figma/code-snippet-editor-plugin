@@ -89,6 +89,7 @@
         display: flex;
         flex-direction: column;
         gap: 0.5rem;
+        overflow: hidden;
         padding: 0.5rem;
       }
       article + article {
@@ -105,12 +106,31 @@
       div > input {
         flex: 1;
       }
-      textarea {
+      .textarea > textarea,
+      .textarea::after {
         font: 400 var(--font-size) / var(--line-height) Andale Mono, Roboto Mono,
           monospace;
+        grid-area: 1 / 1 / 2 / 2;
         min-height: 10vh;
+        padding: 0.25rem 0.5rem 0.4rem 0.25rem;
         text-wrap: nowrap;
       }
+      .textarea {
+        display: grid;
+      }
+      .textarea::after {
+        content: attr(data-replicated-value) " ";
+        visibility: hidden;
+        white-space: pre;
+      }
+      .textarea > textarea {
+        resize: none;
+        overflow-x: auto;
+        overflow-y: hidden;
+        width: calc(100vw - 1rem);
+      }
+
+      .textarea::after,
       textarea,
       input,
       button,
@@ -125,6 +145,7 @@
         line-height: var(--line-height);
       }
       input,
+      .textarea::after,
       textarea {
         background: var(--figma-color-bg-secondary);
         border: none;
@@ -151,10 +172,14 @@
         border-color: var(--figma-color-border);
       }
       input,
+      select {
+        padding: 0.25rem;
+      }
+      input,
+      .textarea::after,
       textarea,
       select {
         color: var(--figma-color-text);
-        padding: 0.25rem;
       }
       button:focus-visible,
       input:focus-visible,
@@ -258,9 +283,6 @@
       }
 
       function onChange(event) {
-        if (event && event.target.tagName === "TEXTAREA") {
-          resizeTextarea(event.target);
-        }
         const data = snippetList
           .filter((a) => Boolean(a.textarea.value))
           .map(({ textarea, select, input }) => ({
@@ -284,6 +306,9 @@
       ) {
         const article = document.createElement("article");
         const textarea = document.createElement("textarea");
+        const textareaGrow = document.createElement("div");
+        textareaGrow.className = "textarea";
+        textareaGrow.appendChild(textarea);
         const select = document.createElement("select");
         const selectLabel = document.createElement("label");
         selectLabel.className = "select";
@@ -302,25 +327,23 @@
         });
         input.addEventListener("input", onChange);
         select.addEventListener("change", onChange);
-        textarea.addEventListener("input", onChange);
+        textarea.addEventListener("change", onChange);
+        textarea.addEventListener("input", () => {
+          textareaGrow.dataset.replicatedValue = textarea.value;
+        });
         remove.innerHTML = `<svg class="svg" width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg"><path d="M5.99996 5.29286L9.5355 1.75732L10.2426 2.46443L6.70707 5.99996L10.2426 9.5355L9.5355 10.2426L5.99996 6.70707L2.46443 10.2426L1.75732 9.5355L5.29286 5.99996L1.75732 2.46443L2.46443 1.75732L5.99996 5.29286Z"/></svg>`;
         select.innerHTML = LANGUAGE_OPTIONS;
         input.value = title;
         select.value = language;
         textarea.value = code;
-        setTimeout(() => resizeTextarea(textarea), 0);
+        textareaGrow.dataset.replicatedValue = textarea.value;
         const div = document.createElement("div");
         div.appendChild(input);
         div.appendChild(selectLabel);
         div.appendChild(remove);
         article.appendChild(div);
-        article.appendChild(textarea);
+        article.appendChild(textareaGrow);
         return { textarea, select, input, article };
-      }
-
-      function resizeTextarea(textarea) {
-        textarea.style.height = "auto";
-        textarea.style.height = `${textarea.scrollHeight + 12}px`;
       }
     </script>
   </body>
