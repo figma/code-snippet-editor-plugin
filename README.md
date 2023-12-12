@@ -1,3 +1,5 @@
+![](./Code%20Snippet%20Editor%20Banner.png)
+
 # Code Snippet Editor
 
 Translate component variants, properties, and more into dynamic code snippets for your design system.
