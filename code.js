@@ -10,7 +10,7 @@ if (figma.mode === "codegen") {
       const absWidth = width * figma.viewport.zoom;
       const absHeight = height * figma.viewport.zoom;
       const finalWidth = Math.round(
-        Math.max(Math.min(absWidth, 300), Math.min(absWidth * 0.5, 600))
+        Math.max(Math.min(absWidth, 400), Math.min(absWidth * 0.6, 700))
       );
       const finalHeight = Math.round(Math.min(absHeight, 600));
       const realX = x + Math.round(absWidth - finalWidth);
