@@ -10,7 +10,7 @@ if (figma.mode === "codegen") {
       const absWidth = width * figma.viewport.zoom;
       const absHeight = height * figma.viewport.zoom;
       const finalWidth = Math.round(
-        Math.max(Math.min(absWidth, 400), Math.min(absWidth * 0.6, 700))
+        Math.max(Math.min(absWidth, 400), Math.min(absWidth * 0.6, 700)),
       );
       const finalHeight = Math.round(Math.min(absHeight, 600));
       const realX = x + Math.round(absWidth - finalWidth);
@@ -30,7 +30,7 @@ if (figma.mode === "codegen") {
       figma.currentPage.selection[0].setSharedPluginData(
         PLUGIN_DATA_NAMESPACE,
         PLUGIN_DATA_KEY,
-        event.data
+        event.data,
       );
     } else {
       console.log("UNKNOWN EVENT", event);
@@ -51,7 +51,7 @@ if (figma.mode === "codegen") {
       const snippetData = await findAndGenerateSelectionSnippetData(
         currentNode,
         params,
-        raw
+        raw,
       );
 
       const snippets = snippetsFromSnippetData(snippetData, isDetailsMode);
@@ -120,7 +120,7 @@ if (figma.mode === "codegen") {
           component.setSharedPluginData(
             PLUGIN_DATA_NAMESPACE,
             PLUGIN_DATA_KEY,
-            dataToSave
+            dataToSave,
           );
         }
       }
@@ -162,7 +162,7 @@ async function findAndGenerateSelectionSnippetData(currentNode, params, raw) {
   async function pluginDataForNode(node) {
     const pluginData = node.getSharedPluginData(
       PLUGIN_DATA_NAMESPACE,
-      PLUGIN_DATA_KEY
+      PLUGIN_DATA_KEY,
     );
     // skipping duplicates. why?
     // component instances have same pluginData as mainComponent, unless they have override pluginData.
@@ -172,7 +172,7 @@ async function findAndGenerateSelectionSnippetData(currentNode, params, raw) {
         pluginData,
         currentNode,
         params,
-        raw
+        raw,
       );
       data.push({ codeArray, pluginDataArray, nodeType: node.type });
     }
@@ -218,8 +218,8 @@ async function hydrateSnippets(pluginData, currentNode, params, raw) {
   const pluginDataArray = JSON.parse(pluginData);
   const codeArray = [];
 
-  pluginDataArray.forEach((pluginData) => {
-    const lines = pluginData.code.split("\n");
+  const hydrate = async (pluginDataCode, params, raw) => {
+    const lines = pluginDataCode.split("\n");
     const code = [];
     lines.forEach((line) => {
       const [matches, qualifies] = lineQualifierMatch(line, params);
@@ -234,7 +234,7 @@ async function hydrateSnippets(pluginData, currentNode, params, raw) {
         let succeeded = true;
         symbolMatches.forEach((symbolMatch) => {
           const [match, param, _, filter] = symbolMatch.map((a) =>
-            a ? a.trim() : a
+            a ? a.trim() : a,
           );
           if (param in params) {
             const value = filterString(params[param], raw[param], filter);
@@ -251,14 +251,38 @@ async function hydrateSnippets(pluginData, currentNode, params, raw) {
       }
     });
 
-    const codeString = code
+    return code
       .join("\n")
       .replace(/\\\\\n/g, "") // collapse single line leading space
       .replace(/\\\n\\/g, "") // collapse single line trailing space
       .replace(/\\\n/g, " "); // collapse single line
+  };
 
-    codeArray.push(codeString);
-  });
+  for (const pluginData of pluginDataArray) {
+    let code = pluginData.code;
+
+    // Matches the pattern {{#each [something]}}[anything]{{/each}}
+    const eachBlockPattern =
+      /\{\{#each ([^ 　]+)}}((?:(?!\{\{\/each}}).)*)\{\{\/each}}/gs;
+    // Find all matches in pluginData.code
+    const childrenMatches = [...pluginData.code.matchAll(eachBlockPattern)];
+
+    for (const match of childrenMatches) {
+      const [_, property, snippetInEach] = match;
+      const children = currentNode[property] || [];
+      const results = await Promise.all(
+        children.map(async (child) => {
+          const { params, raw } = await paramsFromNode(child);
+          const codeInEach = await hydrate(snippetInEach, params, raw);
+          return codeInEach.replace(/^\s*\n/, "").replace(/\n\s*$/g, "");
+        }),
+      );
+
+      code = code.replace(match[2], `\n${results.join("\n")}\n`);
+    }
+
+    codeArray.push(await hydrate(code, params, raw));
+  }
 
   return { params, pluginDataArray, codeArray };
 }
@@ -298,7 +322,7 @@ function lineQualifierMatch(line, params) {
   let valid = true;
   matches.forEach((match) => {
     const [_, polarity, symbol, equals, value] = match.map((a) =>
-      a ? a.trim() : a
+      a ? a.trim() : a,
     );
 
     const symbolIsDefined = symbol in params;
@@ -378,7 +402,7 @@ async function paramsFromNode(node, propertiesOnly = false) {
         itemKeys.length > 1 ? `property.${key}.i` : `property.${key}`;
       for (let k in instanceProperties[key].params) {
         params[`${keyPrefix}.${k}`] = splitString(
-          instanceProperties[key].params[k]
+          instanceProperties[key].params[k],
         );
         raw[`${keyPrefix}.${k}`] = instanceProperties[key].raw[k];
       }
@@ -438,7 +462,7 @@ async function initialParamsFromNode(node) {
           const syntaxKey = syntax.charAt(0).toLowerCase();
           raw[`variables.${key}.${syntaxKey}`] = va.codeSyntax[syntax];
           params[`variables.${key}.${syntaxKey}`] = splitString(
-            va.codeSyntax[syntax]
+            va.codeSyntax[syntax],
           );
         }
       });
@@ -526,7 +550,7 @@ function valueObjectFromNode(node) {
     if (node.parent && node.parent.type === "COMPONENT_SET") {
       const initialProps = Object.assign(
         {},
-        node.parent.componentPropertyDefinitions
+        node.parent.componentPropertyDefinitions,
       );
       const nameProps = node.name.split(", ");
       nameProps.forEach((prop) => {
@@ -575,7 +599,7 @@ function getExportJSON() {
   components.forEach((component) => {
     const pluginData = component.getSharedPluginData(
       PLUGIN_DATA_NAMESPACE,
-      PLUGIN_DATA_KEY
+      PLUGIN_DATA_KEY,
     );
     if (pluginData) {
       data[component.key] = JSON.parse(pluginData);
@@ -615,7 +639,7 @@ async function getNodeDataJSON() {
     nodes.map(async (node) => {
       data[`${node.name} ${node.type} ${node.id}`] = await paramsFromNode(node);
       return;
-    })
+    }),
   );
   return JSON.stringify(data, null, 2);
 }
