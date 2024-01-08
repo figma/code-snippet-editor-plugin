@@ -1,6 +1,16 @@
 const PLUGIN_DATA_NAMESPACE = "codesnippets";
 const PLUGIN_DATA_KEY = "snippets";
 
+const regexQualifierSingle = "([^}&|]+)";
+const regexQualifierOr = "([^}&]+)";
+const regexQualifierAnd = "([^}|]+)";
+const regexQualifiers = [
+  regexQualifierSingle,
+  regexQualifierOr,
+  regexQualifierAnd,
+].join("|");
+const regexQualifier = new RegExp(`\{\{([\?\!])(${regexQualifiers})\}\}`, "g");
+
 if (figma.mode === "codegen") {
   console.clear();
 
@@ -288,7 +298,7 @@ function filterString(string, rawString, filter) {
 
 function lineQualifierMatch(line, params) {
   // Line qualifier statement. {{?something=value}} | {{!something=value}} | {{?something}}
-  const matches = [...line.matchAll(/\{\{([\?\!])([^=]+)(=([^\}]+))?\}\}/g)];
+  const matches = [...line.matchAll(regexQualifier)];
 
   // No qualifier statement on the line. This is valid.
   if (!matches.length) {
@@ -297,24 +307,33 @@ function lineQualifierMatch(line, params) {
 
   let valid = true;
   matches.forEach((match) => {
-    const [_, polarity, symbol, equals, value] = match.map((a) =>
-      a ? a.trim() : a
+    const [_, polarity, statements, matchSingle, matchOr, matchAnd] = match.map(
+      (a) => (a ? a.trim() : a)
     );
-
-    const symbolIsDefined = symbol in params;
-    const paramsMatch = params[symbol] === value;
     const isNegative = polarity === "!";
     const isPositive = polarity === "?";
-    const presenceOnly = !Boolean(equals);
-    const presenceOnlyValid =
-      presenceOnly &&
-      ((isNegative && !symbolIsDefined) || (isPositive && symbolIsDefined));
-    const paramsMatchValid =
-      !presenceOnly &&
-      symbolIsDefined &&
-      ((isNegative && !paramsMatch) || (isPositive && paramsMatch));
-    if (!presenceOnlyValid && !paramsMatchValid) {
+
+    const isSingle = Boolean(matchSingle);
+    const isOr = Boolean(matchOr);
+    const isAnd = Boolean(matchAnd);
+
+    const subStatements = statements.split(isOr ? "|" : "&");
+
+    const results = subStatements.map((match) => {
+      const [_, symbol, equals, value] = match.match(/([^=]+)(=([^\}]+))?/);
+      const symbolIsDefined = symbol in params;
+      const paramsMatch = params[symbol] === value;
+      const presenceOnly = !Boolean(equals);
+      return presenceOnly ? symbolIsDefined : paramsMatch;
+    });
+    if (isNegative && results.includes(true)) {
       valid = false;
+    } else if (isPositive) {
+      if (isOr && !results.includes(true)) {
+        valid = false;
+      } else if ((isSingle || isAnd) && results.includes(false)) {
+        valid = false;
+      }
     }
   });
 
