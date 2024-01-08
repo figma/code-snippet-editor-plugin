@@ -141,7 +141,7 @@ action: actionName)
 {{?property.state=disabled}}disabled
 {{!property.style=secondaryDefault}}appearance="{{property.style}}"
 {{!property.size=medium}}size="{{property.size}}"
-{{!property.layout=textOnly}}{{!property.size=large}}icon={<{{property.regularIconSM|pascal}} />}
+{{!property.layout=textOnly&property.size=large}}icon={<{{property.regularIconSM|pascal}} />}
 {{!property.layout=textOnly}}{{?property.size=large}}icon={<{{property.regularIconLarge|pascal}} />}
 {{?property.layout=iconBefore}}iconPosition="before"
 {{?property.layout=iconOnly}}/>
