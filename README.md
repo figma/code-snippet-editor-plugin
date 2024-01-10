@@ -8,6 +8,7 @@ Translate component variants, properties, and more into dynamic code snippets fo
 - [Templating](#templating)
   - [Symbols](#symbols)
   - [Qualifiers](#qualifiers)
+  - [Operators](#operators)
   - [Samples](#samples)
   - [Single Line Syntax](#single-line-syntax)
 - [Params](#params)
@@ -71,6 +72,22 @@ You can also detect the presence of a property by omitting the equals sign and v
 {{?something=yes}}something is "yes"
 {{!something=yes}}something is not "yes"
 ```
+
+### Operators
+
+While you can add multiple qualifiers to a single line, using an operator is often a better way to express logic. You can make "or" statements with `|`, as well as "and" statements with `&`.
+
+For example, `{{?A=1}}{{?B=2}}` can also be expressed as `{{?A=1&B=2}}`.
+
+```
+{{?A=1&B=2}}A is "1" AND B is "2"
+{{?A=1|B=2}}A is "1" OR B is "2"
+{{!A=1&B=2}}A is NOT "1" AND B is NOT "2"
+{{!A=1|B=2}}A is NOT "1" OR B is NOT "2"
+{{?A=1|B=2|C=3}}A is "1" OR B is "2" OR C is "3"
+```
+
+You cannot combine "or" and "and" statements (eg. `A=1|B=2&C=3`). You can express them as separate qualifying statements (eg.`{{?A=1|B=2}}{{?C=3}}`).
 
 ### Samples
 
