@@ -1,0 +1,26 @@
+{
+  "name": "code-snippet-editor-plugin",
+  "version": "1.0.0",
+  "description": "Translate component variants, properties, and more into dynamic code snippets for your design system.",
+  "main": "code.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "esbuild src/code.ts --bundle --outfile=code.js",
+    "dev": "npm run build -- --watch"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/figma/code-snippet-editor-plugin.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/figma/code-snippet-editor-plugin/issues"
+  },
+  "homepage": "https://github.com/figma/code-snippet-editor-plugin#readme",
+  "devDependencies": {
+    "@figma/plugin-typings": "^1.85.0",
+    "esbuild": "^0.19.12",
+    "typescript": "^5.3.3"
+  }
+}
