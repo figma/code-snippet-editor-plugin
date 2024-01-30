@@ -1,6 +1,12 @@
 import { PLUGIN_DATA_KEY, PLUGIN_DATA_NAMESPACE } from "./config";
-import { hydrateSnippets } from "./hydrateSnippets";
 import { paramsFromNode } from "./params";
+import {
+  bulkExport,
+  bulkGetComponentData,
+  bulkGetNodeData,
+  bulkImport,
+} from "./bulk";
+import { snippetDataFromNode } from "./snippets";
 
 if (figma.mode === "codegen") {
   console.clear();
@@ -29,19 +35,19 @@ if (figma.mode === "codegen") {
 
   figma.codegen.on("generate", async () => {
     try {
-      const currentNode = handleCurrentSelection();
-      const paramsMap = await paramsFromNode(currentNode);
       const { detailsMode, defaultSnippet } =
         figma.codegen.preferences.customSettings;
       const isDetailsMode = detailsMode === "on";
       const hasDefaultMessage = defaultSnippet === "message";
+      const currentNode = handleCurrentSelection();
 
-      const snippetData = await findAndGenerateSelectionSnippetData(
-        currentNode,
-        paramsMap
+      const paramsMap = await paramsFromNode(currentNode);
+      const snippetData = await snippetDataFromNode(currentNode, paramsMap);
+
+      const snippets = codegenResultsFromSnippetData(
+        snippetData,
+        isDetailsMode
       );
-
-      const snippets = snippetsFromSnippetData(snippetData, isDetailsMode);
 
       if (isDetailsMode) {
         snippets.push({
@@ -78,41 +84,13 @@ if (figma.mode === "codegen") {
     if (event.type === "INITIALIZE") {
       handleCurrentSelection();
     } else if (event.type === "COMPONENT_DATA") {
-      const jsonString = getComponentDataJSON();
-      figma.ui.postMessage({
-        type: "COMPONENT_DATA",
-        code: jsonString,
-      });
+      bulkGetComponentData();
     } else if (event.type === "NODE_DATA") {
-      const jsonString = await getNodeDataJSON();
-      figma.ui.postMessage({
-        type: "NODE_DATA",
-        code: jsonString,
-      });
+      await bulkGetNodeData();
     } else if (event.type === "EXPORT") {
-      const jsonString = getExportJSON();
-      figma.ui.postMessage({
-        type: "EXPORT",
-        code: jsonString,
-      });
+      bulkExport();
     } else if (event.type === "IMPORT") {
-      const componentsByKey = getComponentsInFileByKey();
-      const data = JSON.parse(event.data);
-      let componentCount = 0;
-      for (let componentKey in data) {
-        const dataToSave = JSON.stringify(data[componentKey]);
-        const component = componentsByKey[componentKey];
-        if (component) {
-          componentCount++;
-          component.setSharedPluginData(
-            PLUGIN_DATA_NAMESPACE,
-            PLUGIN_DATA_KEY,
-            dataToSave
-          );
-        }
-      }
-      const s = componentCount === 1 ? "" : "s";
-      figma.notify(`Updated ${componentCount} Component${s}`);
+      bulkImport(event.data);
     }
   });
 
@@ -140,71 +118,26 @@ function openCodeSnippetEditorUI() {
   });
 }
 
-function snippetsFromSnippetData(
-  snippetData: PluginDataAndParams[],
+function codegenResultsFromSnippetData(
+  snippetData: SnippetData[],
   isDetailsMode: boolean
 ) {
-  const snippets: CodegenResult[] = [];
+  const codegenResult: CodegenResult[] = [];
   snippetData.forEach((pluginDataAndParams) => {
     const { codeArray, pluginDataArray, nodeType } = pluginDataAndParams;
     pluginDataArray.forEach(({ title, code: templateCode, language }, i) => {
       const code = codeArray[i];
       if (isDetailsMode) {
-        snippets.push({
+        codegenResult.push({
           title: `${title}: Template (${nodeType})`,
           code: templateCode,
           language: "PLAINTEXT",
         });
       }
-      snippets.push({ title, language, code });
+      codegenResult.push({ title, language, code });
     });
   });
-  return snippets;
-}
-
-async function findAndGenerateSelectionSnippetData(
-  currentNode: SceneNode,
-  paramsMap: CodeSnippetParamsMap
-) {
-  const data: PluginDataAndParams[] = [];
-  const seenTemplates: { [k: string]: number } = {};
-
-  async function pluginDataForNode(node: SceneNode) {
-    const pluginData = node.getSharedPluginData(
-      PLUGIN_DATA_NAMESPACE,
-      PLUGIN_DATA_KEY
-    );
-    // skipping duplicates. why?
-    // component instances have same pluginData as mainComponent, unless they have override pluginData.
-    if (pluginData && !seenTemplates[pluginData]) {
-      seenTemplates[pluginData] = 1;
-      const { pluginDataArray, codeArray } = await hydrateSnippets(
-        pluginData,
-        paramsMap
-      );
-      data.push({ codeArray, pluginDataArray, nodeType: node.type });
-    }
-  }
-
-  await pluginDataForNode(currentNode);
-  if (currentNode.type === "INSTANCE") {
-    if (currentNode.mainComponent) {
-      await pluginDataForNode(currentNode.mainComponent);
-      if (
-        currentNode.mainComponent.parent &&
-        currentNode.mainComponent.parent.type === "COMPONENT_SET"
-      ) {
-        await pluginDataForNode(currentNode.mainComponent.parent);
-      }
-    }
-  } else if (
-    currentNode.type === "COMPONENT" &&
-    currentNode.parent &&
-    currentNode.parent.type === "COMPONENT_SET"
-  ) {
-    await pluginDataForNode(currentNode.parent);
-  }
-  return data;
+  return codegenResult;
 }
 
 function handleCurrentSelection() {
@@ -226,80 +159,4 @@ function handleCurrentSelection() {
     // no ui open. ignore this.
     return node;
   }
-}
-
-function getExportJSON() {
-  const data: { [k: string]: CodegenResult[] } = {};
-  const components = componentNodesInFile();
-  components.forEach((component) => {
-    const pluginData = component.getSharedPluginData(
-      PLUGIN_DATA_NAMESPACE,
-      PLUGIN_DATA_KEY
-    );
-    if (pluginData) {
-      data[component.key] = JSON.parse(pluginData) as CodegenResult[];
-    }
-  });
-  return JSON.stringify(data, null, 2);
-}
-
-function getComponentDataJSON() {
-  const components = componentNodesInFile();
-  const componentData: {
-    [k: string]: { name: string; description: string; lineage: string };
-  } = {};
-  const data = components.reduce((into, component) => {
-    if (component.parent && component.parent.type !== "COMPONENT_SET") {
-      const lineage = [];
-      let node: BaseNode | null = component.parent;
-      if (node) {
-        while (node && node.type !== "PAGE") {
-          lineage.push(node.name);
-          node = node.parent;
-        }
-      }
-      lineage.reverse();
-      into[component.key] = {
-        name: component.name,
-        description: component.description,
-        lineage: lineage.join("/"),
-      };
-    }
-    return into;
-  }, componentData);
-  return JSON.stringify(data, null, 2);
-}
-
-async function getNodeDataJSON() {
-  const nodes = figma.currentPage.selection;
-  const data: { [k: string]: CodeSnippetParamsMap } = {};
-  await Promise.all(
-    nodes.map(async (node) => {
-      data[keyFromNode(node)] = await paramsFromNode(node);
-      return;
-    })
-  );
-  return JSON.stringify(data, null, 2);
-}
-
-function keyFromNode(node: SceneNode) {
-  return `${node.name} ${node.type} ${node.id}`;
-}
-
-function getComponentsInFileByKey() {
-  const components = componentNodesInFile();
-  const data: { [k: string]: ComponentNode | ComponentSetNode } = {};
-  components.forEach((component) => (data[component.key] = component));
-  return data;
-}
-
-function componentNodesInFile() {
-  if (figma.currentPage.parent) {
-    return (
-      figma.currentPage.parent.findAllWithCriteria({
-        types: ["COMPONENT", "COMPONENT_SET"],
-      }) || []
-    );
-  }
-  return [];
 }

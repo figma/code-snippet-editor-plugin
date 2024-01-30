@@ -4,7 +4,15 @@ type CodeSnippetParamsMap = {
   params: CodeSnippetParams;
 };
 
-interface PluginDataAndParams {
+type SnippetStringFilter =
+  | "hyphen"
+  | "camel"
+  | "constant"
+  | "pascal"
+  | "raw"
+  | "snake";
+
+interface SnippetData {
   codeArray: string[];
   pluginDataArray: CodegenResult[];
   nodeType: string;

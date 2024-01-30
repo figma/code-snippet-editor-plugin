@@ -1,4 +1,4 @@
-import { formatString } from "./utils";
+import { formatStringWithFilter } from "./snippets";
 
 export async function paramsFromNode(node: BaseNode, propertiesOnly = false) {
   const valueObject = valueObjectFromNode(node);
@@ -119,7 +119,7 @@ async function initialParamsFromNode(node: BaseNode) {
     params["component.name"] = splitString(componentNode.name);
   }
   for (let key in css) {
-    const k = formatString(key, key, "camel");
+    const k = formatStringWithFilter(key, key, "camel");
     params[`css.${k}`] = css[key];
     raw[`css.${k}`] = css[key];
   }
