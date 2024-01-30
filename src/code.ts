@@ -190,13 +190,17 @@ async function findAndGenerateSelectionSnippetData(
   if (currentNode.type === "INSTANCE") {
     if (currentNode.mainComponent) {
       await pluginDataForNode(currentNode.mainComponent);
-      if (currentNode.mainComponent.parent?.type === "COMPONENT_SET") {
+      if (
+        currentNode.mainComponent.parent &&
+        currentNode.mainComponent.parent.type === "COMPONENT_SET"
+      ) {
         await pluginDataForNode(currentNode.mainComponent.parent);
       }
     }
   } else if (
     currentNode.type === "COMPONENT" &&
-    currentNode.parent?.type === "COMPONENT_SET"
+    currentNode.parent &&
+    currentNode.parent.type === "COMPONENT_SET"
   ) {
     await pluginDataForNode(currentNode.parent);
   }
@@ -226,10 +230,7 @@ function handleCurrentSelection() {
 
 function getExportJSON() {
   const data: { [k: string]: CodegenResult[] } = {};
-  const components =
-    figma.currentPage.parent?.findAllWithCriteria({
-      types: ["COMPONENT", "COMPONENT_SET"],
-    }) || [];
+  const components = componentNodesInFile();
   components.forEach((component) => {
     const pluginData = component.getSharedPluginData(
       PLUGIN_DATA_NAMESPACE,
@@ -243,15 +244,12 @@ function getExportJSON() {
 }
 
 function getComponentDataJSON() {
-  const components =
-    figma.currentPage.parent?.findAllWithCriteria({
-      types: ["COMPONENT", "COMPONENT_SET"],
-    }) || [];
+  const components = componentNodesInFile();
   const componentData: {
     [k: string]: { name: string; description: string; lineage: string };
   } = {};
   const data = components.reduce((into, component) => {
-    if (component.parent?.type !== "COMPONENT_SET") {
+    if (component.parent && component.parent.type !== "COMPONENT_SET") {
       const lineage = [];
       let node: BaseNode | null = component.parent;
       if (node) {
@@ -289,11 +287,19 @@ function keyFromNode(node: SceneNode) {
 }
 
 function getComponentsInFileByKey() {
-  const components =
-    figma.currentPage.parent?.findAllWithCriteria({
-      types: ["COMPONENT", "COMPONENT_SET"],
-    }) || [];
+  const components = componentNodesInFile();
   const data: { [k: string]: ComponentNode | ComponentSetNode } = {};
   components.forEach((component) => (data[component.key] = component));
   return data;
+}
+
+function componentNodesInFile() {
+  if (figma.currentPage.parent) {
+    return (
+      figma.currentPage.parent.findAllWithCriteria({
+        types: ["COMPONENT", "COMPONENT_SET"],
+      }) || []
+    );
+  }
+  return [];
 }

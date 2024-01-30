@@ -88,7 +88,9 @@ export async function paramsFromNode(node: BaseNode, propertiesOnly = false) {
 function nameFromFoundInstanceSwapNode(node: BaseNode | null) {
   return node && node.parent && node.parent.type === "COMPONENT_SET"
     ? node.parent.name
-    : node?.name || "";
+    : node
+    ? node.name
+    : "";
 }
 
 async function initialParamsFromNode(node: BaseNode) {
@@ -244,7 +246,7 @@ function getComponentNodeFromNode(node: BaseNode) {
   } else if (type === "INSTANCE") {
     const { mainComponent } = node;
     return mainComponent
-      ? mainComponent.parent?.type === "COMPONENT_SET"
+      ? mainComponent.parent && mainComponent.parent.type === "COMPONENT_SET"
         ? mainComponent.parent
         : mainComponent
       : null;

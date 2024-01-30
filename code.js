@@ -188,7 +188,7 @@
     };
   }
   function nameFromFoundInstanceSwapNode(node) {
-    return node && node.parent && node.parent.type === "COMPONENT_SET" ? node.parent.name : node?.name || "";
+    return node && node.parent && node.parent.type === "COMPONENT_SET" ? node.parent.name : node ? node.name : "";
   }
   async function initialParamsFromNode(node) {
     const componentNode = getComponentNodeFromNode(node);
@@ -325,7 +325,7 @@
       return parent;
     } else if (type === "INSTANCE") {
       const { mainComponent } = node;
-      return mainComponent ? mainComponent.parent?.type === "COMPONENT_SET" ? mainComponent.parent : mainComponent : null;
+      return mainComponent ? mainComponent.parent && mainComponent.parent.type === "COMPONENT_SET" ? mainComponent.parent : mainComponent : null;
     }
   }
   function splitString(string = "") {
@@ -501,11 +501,11 @@
     if (currentNode.type === "INSTANCE") {
       if (currentNode.mainComponent) {
         await pluginDataForNode(currentNode.mainComponent);
-        if (currentNode.mainComponent.parent?.type === "COMPONENT_SET") {
+        if (currentNode.mainComponent.parent && currentNode.mainComponent.parent.type === "COMPONENT_SET") {
           await pluginDataForNode(currentNode.mainComponent.parent);
         }
       }
-    } else if (currentNode.type === "COMPONENT" && currentNode.parent?.type === "COMPONENT_SET") {
+    } else if (currentNode.type === "COMPONENT" && currentNode.parent && currentNode.parent.type === "COMPONENT_SET") {
       await pluginDataForNode(currentNode.parent);
     }
     return data;
@@ -529,9 +529,7 @@
   }
   function getExportJSON() {
     const data = {};
-    const components = figma.currentPage.parent?.findAllWithCriteria({
-      types: ["COMPONENT", "COMPONENT_SET"]
-    }) || [];
+    const components = componentNodesInFile();
     components.forEach((component) => {
       const pluginData = component.getSharedPluginData(
         PLUGIN_DATA_NAMESPACE,
@@ -544,12 +542,10 @@
     return JSON.stringify(data, null, 2);
   }
   function getComponentDataJSON() {
-    const components = figma.currentPage.parent?.findAllWithCriteria({
-      types: ["COMPONENT", "COMPONENT_SET"]
-    }) || [];
+    const components = componentNodesInFile();
     const componentData = {};
     const data = components.reduce((into, component) => {
-      if (component.parent?.type !== "COMPONENT_SET") {
+      if (component.parent && component.parent.type !== "COMPONENT_SET") {
         const lineage = [];
         let node = component.parent;
         if (node) {
@@ -584,11 +580,17 @@
     return `${node.name} ${node.type} ${node.id}`;
   }
   function getComponentsInFileByKey() {
-    const components = figma.currentPage.parent?.findAllWithCriteria({
-      types: ["COMPONENT", "COMPONENT_SET"]
-    }) || [];
+    const components = componentNodesInFile();
     const data = {};
     components.forEach((component) => data[component.key] = component);
     return data;
+  }
+  function componentNodesInFile() {
+    if (figma.currentPage.parent) {
+      return figma.currentPage.parent.findAllWithCriteria({
+        types: ["COMPONENT", "COMPONENT_SET"]
+      }) || [];
+    }
+    return [];
   }
 })();
