@@ -4,7 +4,30 @@
   var PLUGIN_DATA_NAMESPACE = "codesnippets";
   var PLUGIN_DATA_KEY = "snippets";
 
-  // src/code.ts
+  // src/utils.ts
+  function formatString(string, rawString, filter) {
+    if (!filter)
+      filter = "hyphen";
+    const splitString2 = string.split("-");
+    const capitalize2 = (s) => s.charAt(0).toUpperCase() + s.substring(1);
+    switch (filter) {
+      case "camel":
+        return splitString2.map((word, i) => i === 0 ? word : capitalize2(word)).join("");
+      case "constant":
+        return splitString2.join("_").toUpperCase();
+      case "hyphen":
+        return splitString2.join("-").toLowerCase();
+      case "pascal":
+        return splitString2.map(capitalize2).join("");
+      case "raw":
+        return rawString;
+      case "snake":
+        return splitString2.join("_").toLowerCase();
+    }
+    return splitString2.join(" ");
+  }
+
+  // src/hydrateSnippets.ts
   var regexQualifierSingle = "([^}&|]+)";
   var regexQualifierOr = "([^}&]+)";
   var regexQualifierAnd = "([^}|]+)";
@@ -14,6 +37,306 @@
     regexQualifierAnd
   ].join("|");
   var regexQualifier = new RegExp(`{{([?!])(${regexQualifiers})}}`, "g");
+  async function hydrateSnippets(pluginData, { raw, params }) {
+    const pluginDataArray = JSON.parse(pluginData);
+    const codeArray = [];
+    pluginDataArray.forEach((pluginData2) => {
+      const lines = pluginData2.code.split("\n");
+      const code = [];
+      lines.forEach((line) => {
+        const [matches, qualifies] = lineQualifierMatch(line, params);
+        matches.forEach((match) => {
+          line = line.replace(match[0], "");
+        });
+        const symbolMatches = [
+          ...line.matchAll(/\{\{([^\{\?\}\|]+)(\|([^\{\?\}]+))?\}\}/g)
+        ];
+        if (qualifies && symbolMatches.length) {
+          let succeeded = true;
+          symbolMatches.forEach((symbolMatch) => {
+            const [match, param, _, filter] = symbolMatch.map(
+              (a) => a ? a.trim() : a
+            );
+            if (param in params) {
+              const value = formatString(params[param], raw[param], filter);
+              line = line.replace(match, value);
+            } else if (param === "figma.children") {
+              console.log("HELLO WORLD");
+            } else {
+              succeeded = false;
+            }
+          });
+          if (succeeded) {
+            code.push(line);
+          }
+        } else if (qualifies) {
+          code.push(line);
+        }
+      });
+      const codeString = code.join("\n").replace(/\\\\\n/g, "").replace(/\\\n\\/g, "").replace(/\\\n/g, " ");
+      codeArray.push(codeString);
+    });
+    return { params, pluginDataArray, codeArray };
+  }
+  function lineQualifierMatch(line, params) {
+    const matches = [...line.matchAll(regexQualifier)];
+    if (!matches.length) {
+      return [[], true];
+    }
+    let valid = true;
+    matches.forEach((match) => {
+      const [_, polarity, statements, matchSingle, matchOr, matchAnd] = match.map(
+        (a) => a ? a.trim() : a
+      );
+      const isNegative = polarity === "!";
+      const isPositive = polarity === "?";
+      const isSingle = Boolean(matchSingle);
+      const isOr = Boolean(matchOr);
+      const isAnd = Boolean(matchAnd);
+      const subStatements = statements.split(isOr ? "|" : "&");
+      const results = subStatements.map((match2) => {
+        const matches2 = match2.match(/([^=]+)(=([^\}]+))?/);
+        if (matches2) {
+          const [_2, symbol, equals, value] = matches2;
+          const symbolIsDefined = symbol in params;
+          const paramsMatch = params[symbol] === value;
+          const presenceOnly = !Boolean(equals);
+          return presenceOnly ? symbolIsDefined : paramsMatch;
+        } else {
+          return false;
+        }
+      });
+      if (isNegative && results.includes(true)) {
+        valid = false;
+      } else if (isPositive) {
+        if (isOr && !results.includes(true)) {
+          valid = false;
+        } else if ((isSingle || isAnd) && results.includes(false)) {
+          valid = false;
+        }
+      }
+    });
+    return [matches, valid];
+  }
+
+  // src/params.ts
+  async function paramsFromNode(node, propertiesOnly = false) {
+    const valueObject = valueObjectFromNode(node);
+    const object = {};
+    const isDefinitions = isComponentPropertyDefinitionsObject(valueObject);
+    const instanceProperties = {};
+    for (let propertyName in valueObject) {
+      const value = isDefinitions ? valueObject[propertyName].defaultValue : valueObject[propertyName].value;
+      const type = valueObject[propertyName].type;
+      const cleanName = sanitizePropertyName(propertyName);
+      if (value !== void 0) {
+        object[cleanName] = object[cleanName] || {};
+        if (typeof value === "string") {
+          if (type === "VARIANT")
+            object[cleanName].VARIANT = value;
+          if (type === "TEXT")
+            object[cleanName].TEXT = value;
+          if (type === "INSTANCE_SWAP") {
+            const foundNode = await figma.getNodeById(value);
+            const nodeName = nameFromFoundInstanceSwapNode(foundNode);
+            object[cleanName].INSTANCE_SWAP = nodeName;
+            if (foundNode) {
+              instanceProperties[cleanName] = await paramsFromNode(
+                foundNode,
+                true
+              );
+            }
+          }
+        } else {
+          object[cleanName].BOOLEAN = value;
+        }
+      }
+    }
+    const params = {};
+    const raw = {};
+    const initial = await initialParamsFromNode(node);
+    for (let key in object) {
+      const item = object[key];
+      const itemKeys = Object.keys(item);
+      if (itemKeys.length > 1) {
+        itemKeys.forEach((type) => {
+          const value = item[type].toString();
+          params[`property.${key}.${type.charAt(0).toLowerCase()}`] = splitString(value);
+          raw[`property.${key}.${type.charAt(0).toLowerCase()}`] = value;
+        });
+      } else {
+        const value = item[itemKeys[0]].toString();
+        params[`property.${key}`] = splitString(value);
+        raw[`property.${key}`] = value;
+      }
+      if (itemKeys.includes("INSTANCE_SWAP") && instanceProperties[key]) {
+        const keyPrefix = itemKeys.length > 1 ? `property.${key}.i` : `property.${key}`;
+        for (let k in instanceProperties[key].params) {
+          params[`${keyPrefix}.${k}`] = splitString(
+            instanceProperties[key].params[k]
+          );
+          raw[`${keyPrefix}.${k}`] = instanceProperties[key].raw[k];
+        }
+      }
+    }
+    return propertiesOnly ? {
+      params,
+      raw
+    } : {
+      params: Object.assign(params, initial.params),
+      raw: Object.assign(raw, initial.raw)
+    };
+  }
+  function nameFromFoundInstanceSwapNode(node) {
+    return node && node.parent && node.parent.type === "COMPONENT_SET" ? node.parent.name : node?.name || "";
+  }
+  async function initialParamsFromNode(node) {
+    const componentNode = getComponentNodeFromNode(node);
+    const css = await node.getCSSAsync();
+    const autolayout = "inferredAutoLayout" in node ? node.inferredAutoLayout : void 0;
+    const raw = {
+      "node.name": node.name,
+      "node.type": node.type
+    };
+    const params = {
+      "node.name": splitString(node.name),
+      "node.type": splitString(node.type)
+    };
+    if ("key" in node) {
+      raw["node.key"] = node.key;
+      params["node.key"] = node.key;
+    }
+    if (componentNode && "key" in componentNode) {
+      raw["component.key"] = componentNode.key;
+      raw["component.type"] = componentNode.type;
+      raw["component.name"] = componentNode.name;
+      params["component.key"] = componentNode.key;
+      params["component.type"] = splitString(componentNode.type);
+      params["component.name"] = splitString(componentNode.name);
+    }
+    for (let key in css) {
+      const k = formatString(key, key, "camel");
+      params[`css.${k}`] = css[key];
+      raw[`css.${k}`] = css[key];
+    }
+    if ("boundVariables" in node && node.boundVariables) {
+      const boundVariables = node.boundVariables;
+      for (let key in boundVariables) {
+        let vars = boundVariables[key];
+        if (vars) {
+          if (!Array.isArray(vars)) {
+            vars = [vars];
+          }
+          vars.forEach((v) => {
+            const va = figma.variables.getVariableById(v.id);
+            if (va) {
+              raw[`variables.${key}`] = va.name;
+              params[`variables.${key}`] = splitString(va.name);
+              for (let syntax in va.codeSyntax) {
+                const syntaxKey = syntax.charAt(0).toLowerCase();
+                const syntaxName = syntax;
+                const value = va.codeSyntax[syntaxName];
+                if (value) {
+                  raw[`variables.${key}.${syntaxKey}`] = value;
+                  params[`variables.${key}.${syntaxKey}`] = splitString(value);
+                }
+              }
+            }
+          });
+        }
+      }
+    }
+    if (autolayout) {
+      const props = [
+        "layoutMode",
+        "layoutWrap",
+        "paddingLeft",
+        "paddingRight",
+        "paddingTop",
+        "paddingBottom",
+        "itemSpacing",
+        "counterAxisSpacing",
+        "primaryAxisAlignItems",
+        "counterAxisAlignItems"
+      ];
+      props.forEach((p) => {
+        const val = autolayout[p] + "";
+        if (val !== "undefined" && val !== "null") {
+          raw[`autolayout.${p}`] = val;
+          params[`autolayout.${p}`] = splitString(val);
+        }
+      });
+    }
+    return { params, raw };
+  }
+  function isComponentPropertyDefinitionsObject(object) {
+    return object[Object.keys(object)[0]] && "defaultValue" in object[Object.keys(object)[0]];
+  }
+  function valueObjectFromNode(node) {
+    if (node.type === "INSTANCE")
+      return node.componentProperties;
+    if (node.type === "COMPONENT_SET")
+      return node.componentPropertyDefinitions;
+    if (node.type === "COMPONENT") {
+      if (node.parent && node.parent.type === "COMPONENT_SET") {
+        const initialProps = Object.assign(
+          {},
+          node.parent.componentPropertyDefinitions
+        );
+        const nameProps = node.name.split(", ");
+        nameProps.forEach((prop) => {
+          const [propName, propValue] = prop.split("=");
+          initialProps[propName].defaultValue = propValue;
+        });
+        return initialProps;
+      } else {
+        return node.componentPropertyDefinitions;
+      }
+    }
+    return {};
+  }
+  function capitalize(name) {
+    return `${name.charAt(0).toUpperCase()}${name.slice(1)}`;
+  }
+  function downcase(name) {
+    return `${name.charAt(0).toLowerCase()}${name.slice(1)}`;
+  }
+  function numericGuard(name = "") {
+    if (name.charAt(0).match(/\d/)) {
+      name = `N${name}`;
+    }
+    return name;
+  }
+  function capitalizedNameFromName(name = "") {
+    name = numericGuard(name);
+    return name.split(/[^a-zA-Z\d]+/g).map(capitalize).join("");
+  }
+  function sanitizePropertyName(name) {
+    name = name.replace(/#[^#]+$/g, "");
+    return downcase(capitalizedNameFromName(name).replace(/^\d+/g, ""));
+  }
+  function getComponentNodeFromNode(node) {
+    const { type, parent } = node;
+    const parentType = parent ? parent.type : "";
+    const isVariant = parentType === "COMPONENT_SET";
+    if (type === "COMPONENT_SET" || type === "COMPONENT" && !isVariant) {
+      return node;
+    } else if (type === "COMPONENT" && isVariant) {
+      return parent;
+    } else if (type === "INSTANCE") {
+      const { mainComponent } = node;
+      return mainComponent ? mainComponent.parent?.type === "COMPONENT_SET" ? mainComponent.parent : mainComponent : null;
+    }
+  }
+  function splitString(string = "") {
+    string = string.replace(/([^a-zA-Z0-9-_// ])/g, "");
+    if (!string.match(/^[A-Z0-9_]+$/)) {
+      string = string.replace(/([A-Z])/g, " $1");
+    }
+    return string.replace(/([a-z])([0-9])/g, "$1 $2").replace(/([-_/])/g, " ").replace(/  +/g, " ").trim().toLowerCase().split(" ").join("-");
+  }
+
+  // src/code.ts
   if (figma.mode === "codegen") {
     console.clear();
     figma.codegen.on("preferenceschange", async (event) => {
@@ -38,25 +361,24 @@
     figma.codegen.on("generate", async () => {
       try {
         const currentNode = handleCurrentSelection();
-        const { params, raw } = await paramsFromNode(currentNode);
+        const paramsMap = await paramsFromNode(currentNode);
         const { detailsMode, defaultSnippet } = figma.codegen.preferences.customSettings;
         const isDetailsMode = detailsMode === "on";
         const hasDefaultMessage = defaultSnippet === "message";
         const snippetData = await findAndGenerateSelectionSnippetData(
           currentNode,
-          params,
-          raw
+          paramsMap
         );
         const snippets = snippetsFromSnippetData(snippetData, isDetailsMode);
         if (isDetailsMode) {
           snippets.push({
             title: "Node Params",
-            code: JSON.stringify(params, null, 2),
+            code: JSON.stringify(paramsMap.params, null, 2),
             language: "JSON"
           });
           snippets.push({
             title: "Node Params (Raw)",
-            code: JSON.stringify(raw, null, 2),
+            code: JSON.stringify(paramsMap.raw, null, 2),
             language: "JSON"
           });
         }
@@ -158,7 +480,7 @@
     });
     return snippets;
   }
-  async function findAndGenerateSelectionSnippetData(currentNode, params, raw) {
+  async function findAndGenerateSelectionSnippetData(currentNode, paramsMap) {
     const data = [];
     const seenTemplates = {};
     async function pluginDataForNode(node) {
@@ -170,8 +492,7 @@
         seenTemplates[pluginData] = 1;
         const { pluginDataArray, codeArray } = await hydrateSnippets(
           pluginData,
-          params,
-          raw
+          paramsMap
         );
         data.push({ codeArray, pluginDataArray, nodeType: node.type });
       }
@@ -205,320 +526,6 @@
     } catch (e) {
       return node;
     }
-  }
-  async function hydrateSnippets(pluginData, params, raw) {
-    const pluginDataArray = JSON.parse(pluginData);
-    const codeArray = [];
-    pluginDataArray.forEach((pluginData2) => {
-      const lines = pluginData2.code.split("\n");
-      const code = [];
-      lines.forEach((line) => {
-        const [matches, qualifies] = lineQualifierMatch(line, params);
-        matches.forEach((match) => {
-          line = line.replace(match[0], "");
-        });
-        const symbolMatches = [
-          ...line.matchAll(/\{\{([^\{\?\}\|]+)(\|([^\{\?\}]+))?\}\}/g)
-        ];
-        if (qualifies && symbolMatches.length) {
-          let succeeded = true;
-          symbolMatches.forEach((symbolMatch) => {
-            const [match, param, _, filter] = symbolMatch.map(
-              (a) => a ? a.trim() : a
-            );
-            if (param in params) {
-              const value = filterString(params[param], raw[param], filter);
-              line = line.replace(match, value);
-            } else if (param === "figma.children") {
-              console.log("HELLO WORLD");
-            } else {
-              succeeded = false;
-            }
-          });
-          if (succeeded) {
-            code.push(line);
-          }
-        } else if (qualifies) {
-          code.push(line);
-        }
-      });
-      const codeString = code.join("\n").replace(/\\\\\n/g, "").replace(/\\\n\\/g, "").replace(/\\\n/g, " ");
-      codeArray.push(codeString);
-    });
-    return { params, pluginDataArray, codeArray };
-  }
-  function filterString(string, rawString, filter) {
-    if (!filter)
-      filter = "hyphen";
-    const splitString2 = string.split("-");
-    const capitalize2 = (s) => s.charAt(0).toUpperCase() + s.substring(1);
-    switch (filter) {
-      case "camel":
-        return splitString2.map((word, i) => i === 0 ? word : capitalize2(word)).join("");
-      case "constant":
-        return splitString2.join("_").toUpperCase();
-      case "hyphen":
-        return splitString2.join("-").toLowerCase();
-      case "pascal":
-        return splitString2.map(capitalize2).join("");
-      case "raw":
-        return rawString;
-      case "snake":
-        return splitString2.join("_").toLowerCase();
-    }
-    return splitString2.join(" ");
-  }
-  function lineQualifierMatch(line, params) {
-    const matches = [...line.matchAll(regexQualifier)];
-    if (!matches.length) {
-      return [[], true];
-    }
-    let valid = true;
-    matches.forEach((match) => {
-      const [_, polarity, statements, matchSingle, matchOr, matchAnd] = match.map(
-        (a) => a ? a.trim() : a
-      );
-      const isNegative = polarity === "!";
-      const isPositive = polarity === "?";
-      const isSingle = Boolean(matchSingle);
-      const isOr = Boolean(matchOr);
-      const isAnd = Boolean(matchAnd);
-      const subStatements = statements.split(isOr ? "|" : "&");
-      const results = subStatements.map((match2) => {
-        const matches2 = match2.match(/([^=]+)(=([^\}]+))?/);
-        if (matches2) {
-          const [_2, symbol, equals, value] = matches2;
-          const symbolIsDefined = symbol in params;
-          const paramsMatch = params[symbol] === value;
-          const presenceOnly = !Boolean(equals);
-          return presenceOnly ? symbolIsDefined : paramsMatch;
-        } else {
-          return false;
-        }
-      });
-      if (isNegative && results.includes(true)) {
-        valid = false;
-      } else if (isPositive) {
-        if (isOr && !results.includes(true)) {
-          valid = false;
-        } else if ((isSingle || isAnd) && results.includes(false)) {
-          valid = false;
-        }
-      }
-    });
-    return [matches, valid];
-  }
-  function isComponentPropertyDefinitionsObject(object) {
-    return object[Object.keys(object)[0]] && "defaultValue" in object[Object.keys(object)[0]];
-  }
-  async function paramsFromNode(node, propertiesOnly = false) {
-    const valueObject = valueObjectFromNode(node);
-    const object = {};
-    const isDefinitions = isComponentPropertyDefinitionsObject(valueObject);
-    const instanceProperties = {};
-    for (let propertyName in valueObject) {
-      const value = isDefinitions ? valueObject[propertyName].defaultValue : valueObject[propertyName].value;
-      const type = valueObject[propertyName].type;
-      const cleanName = sanitizePropertyName(propertyName);
-      if (value !== void 0) {
-        object[cleanName] = object[cleanName] || {};
-        if (typeof value === "string") {
-          if (type === "VARIANT")
-            object[cleanName].VARIANT = value;
-          if (type === "TEXT")
-            object[cleanName].TEXT = value;
-          if (type === "INSTANCE_SWAP") {
-            const foundNode = await figma.getNodeById(value);
-            const nodeName = foundNode && foundNode.parent && foundNode.parent.type === "COMPONENT_SET" ? foundNode.parent.name : foundNode?.name;
-            object[cleanName].INSTANCE_SWAP = nodeName || "";
-            if (foundNode) {
-              instanceProperties[cleanName] = await paramsFromNode(
-                foundNode,
-                true
-              );
-            }
-          }
-        } else {
-          object[cleanName].BOOLEAN = value;
-        }
-      }
-    }
-    const params = {};
-    const raw = {};
-    const initial = await initialParamsFromNode(node);
-    for (let key in object) {
-      const item = object[key];
-      const itemKeys = Object.keys(item);
-      if (itemKeys.length > 1) {
-        itemKeys.forEach((type) => {
-          const value = item[type].toString();
-          params[`property.${key}.${type.charAt(0).toLowerCase()}`] = splitString(value);
-          raw[`property.${key}.${type.charAt(0).toLowerCase()}`] = value;
-        });
-      } else {
-        const value = item[itemKeys[0]].toString();
-        params[`property.${key}`] = splitString(value);
-        raw[`property.${key}`] = value;
-      }
-      if (itemKeys.includes("INSTANCE_SWAP") && instanceProperties[key]) {
-        const keyPrefix = itemKeys.length > 1 ? `property.${key}.i` : `property.${key}`;
-        for (let k in instanceProperties[key].params) {
-          params[`${keyPrefix}.${k}`] = splitString(
-            instanceProperties[key].params[k]
-          );
-          raw[`${keyPrefix}.${k}`] = instanceProperties[key].raw[k];
-        }
-      }
-    }
-    return propertiesOnly ? {
-      params,
-      raw
-    } : {
-      params: Object.assign(params, initial.params),
-      raw: Object.assign(raw, initial.raw)
-    };
-  }
-  async function initialParamsFromNode(node) {
-    const componentNode = getComponentNodeFromNode(node);
-    const css = await node.getCSSAsync();
-    const autolayout = "inferredAutoLayout" in node ? node.inferredAutoLayout : void 0;
-    const raw = {
-      "node.name": node.name,
-      "node.type": node.type
-    };
-    const params = {
-      "node.name": splitString(node.name),
-      "node.type": splitString(node.type)
-    };
-    if ("key" in node) {
-      raw["node.key"] = node.key;
-      params["node.key"] = node.key;
-    }
-    if (componentNode && "key" in componentNode) {
-      raw["component.key"] = componentNode.key;
-      raw["component.type"] = componentNode.type;
-      raw["component.name"] = componentNode.name;
-      params["component.key"] = componentNode.key;
-      params["component.type"] = splitString(componentNode.type);
-      params["component.name"] = splitString(componentNode.name);
-    }
-    for (let key in css) {
-      const k = filterString(key, key, "camel");
-      params[`css.${k}`] = css[key];
-      raw[`css.${k}`] = css[key];
-    }
-    if ("boundVariables" in node && node.boundVariables) {
-      const boundVariables = node.boundVariables;
-      for (let key in boundVariables) {
-        let vars = boundVariables[key];
-        if (vars) {
-          if (!Array.isArray(vars)) {
-            vars = [vars];
-          }
-          vars.forEach((v) => {
-            const va = figma.variables.getVariableById(v.id);
-            if (va) {
-              raw[`variables.${key}`] = va.name;
-              params[`variables.${key}`] = splitString(va.name);
-              for (let syntax in va.codeSyntax) {
-                const syntaxKey = syntax.charAt(0).toLowerCase();
-                const syntaxName = syntax;
-                const value = va.codeSyntax[syntaxName];
-                if (value) {
-                  raw[`variables.${key}.${syntaxKey}`] = value;
-                  params[`variables.${key}.${syntaxKey}`] = splitString(value);
-                }
-              }
-            }
-          });
-        }
-      }
-    }
-    if (autolayout) {
-      const props = [
-        "layoutMode",
-        "layoutWrap",
-        "paddingLeft",
-        "paddingRight",
-        "paddingTop",
-        "paddingBottom",
-        "itemSpacing",
-        "counterAxisSpacing",
-        "primaryAxisAlignItems",
-        "counterAxisAlignItems"
-      ];
-      props.forEach((p) => {
-        const val = autolayout[p] + "";
-        if (val !== "undefined" && val !== "null") {
-          raw[`autolayout.${p}`] = val;
-          params[`autolayout.${p}`] = splitString(val);
-        }
-      });
-    }
-    return { params, raw };
-  }
-  function getComponentNodeFromNode(node) {
-    const { type, parent } = node;
-    const parentType = parent ? parent.type : "";
-    const isVariant = parentType === "COMPONENT_SET";
-    if (type === "COMPONENT_SET" || type === "COMPONENT" && !isVariant) {
-      return node;
-    } else if (type === "COMPONENT" && isVariant) {
-      return parent;
-    } else if (type === "INSTANCE") {
-      const { mainComponent } = node;
-      return mainComponent ? mainComponent.parent?.type === "COMPONENT_SET" ? mainComponent.parent : mainComponent : null;
-    }
-  }
-  function splitString(string = "") {
-    string = string.replace(/([^a-zA-Z0-9-_// ])/g, "");
-    if (!string.match(/^[A-Z0-9_]+$/)) {
-      string = string.replace(/([A-Z])/g, " $1");
-    }
-    return string.replace(/([a-z])([0-9])/g, "$1 $2").replace(/([-_/])/g, " ").replace(/  +/g, " ").trim().toLowerCase().split(" ").join("-");
-  }
-  function valueObjectFromNode(node) {
-    if (node.type === "INSTANCE")
-      return node.componentProperties;
-    if (node.type === "COMPONENT_SET")
-      return node.componentPropertyDefinitions;
-    if (node.type === "COMPONENT") {
-      if (node.parent && node.parent.type === "COMPONENT_SET") {
-        const initialProps = Object.assign(
-          {},
-          node.parent.componentPropertyDefinitions
-        );
-        const nameProps = node.name.split(", ");
-        nameProps.forEach((prop) => {
-          const [propName, propValue] = prop.split("=");
-          initialProps[propName].defaultValue = propValue;
-        });
-        return initialProps;
-      } else {
-        return node.componentPropertyDefinitions;
-      }
-    }
-    return {};
-  }
-  function capitalize(name) {
-    return `${name.charAt(0).toUpperCase()}${name.slice(1)}`;
-  }
-  function downcase(name) {
-    return `${name.charAt(0).toLowerCase()}${name.slice(1)}`;
-  }
-  function numericGuard(name = "") {
-    if (name.charAt(0).match(/\d/)) {
-      name = `N${name}`;
-    }
-    return name;
-  }
-  function capitalizedNameFromName(name = "") {
-    name = numericGuard(name);
-    return name.split(/[^a-zA-Z\d]+/g).map(capitalize).join("");
-  }
-  function sanitizePropertyName(name) {
-    name = name.replace(/#[^#]+$/g, "");
-    return downcase(capitalizedNameFromName(name).replace(/^\d+/g, ""));
   }
   function getExportJSON() {
     const data = {};
