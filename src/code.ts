@@ -53,6 +53,7 @@ function initializeCodegenMode() {
       /**
        * Settings defined in manifest.json "codegenPreferences" for "details mode" and
        *   what to render when there is no template to render.
+       * https://github.com/figma/code-snippet-editor-plugin/tree/main#details-mode
        */
       const { detailsMode, defaultSnippet } =
         figma.codegen.preferences.customSettings;
@@ -71,6 +72,7 @@ function initializeCodegenMode() {
 
       /**
        * In "Details mode" we render the params and raw params as code snippets
+       * https://github.com/figma/code-snippet-editor-plugin/tree/main#details-mode
        */
       if (isDetailsMode) {
         snippets.push({
@@ -156,6 +158,7 @@ function openCodeSnippetEditorUI() {
 /**
  * Final assembly of the codegen result that will include raw templates when in "details mode"
  * Can have additional things appended to it conditionally, but this yields the main snippet array.
+ * https://github.com/figma/code-snippet-editor-plugin/tree/main#details-mode
  * @param nodeSnippetTemplateDataArray the compiled codegen result array with the raw templates version
  * @param isDetailsMode "details mode" boolean setting value
  * @returns the final codegen result to render

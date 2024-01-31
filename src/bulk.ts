@@ -1,6 +1,10 @@
 import { getPluginData, setPluginData } from "./pluginData";
 import { paramsFromNode } from "./params";
 
+/**
+ * Bulk operations when run in design mode.
+ * https://github.com/figma/code-snippet-editor-plugin/tree/main?#bulk-operations
+ */
 export const bulk = {
   performImport,
   performExport,
@@ -10,6 +14,7 @@ export const bulk = {
 
 /**
  * Import code snippet templates into components in bulk via JSON.
+ * https://github.com/figma/code-snippet-editor-plugin/tree/main#importexport
  * @param eventData stringified CodegenResultTemplatesByComponentKey
  * @returns void
  */
@@ -31,45 +36,63 @@ function performImport(eventData: string) {
 
 /**
  * Export code snippet templates, posting stringified CodegenResultTemplatesByComponentKey to UI
+ * https://github.com/figma/code-snippet-editor-plugin/tree/main#importexport
  * @returns void
  */
 function performExport() {
-  const jsonString = getExportJSON();
+  const data: CodegenResultTemplatesByComponentKey = {};
+  const components = findComponentNodesInFile();
+  components.forEach((component) => {
+    const pluginData = getPluginData(component);
+    if (pluginData) {
+      data[component.key] = JSON.parse(pluginData) as CodegenResult[];
+    }
+  });
   figma.ui.postMessage({
     type: "EXPORT",
-    code: jsonString,
+    code: JSON.stringify(data, null, 2),
   });
 }
 
 /**
  * Export component data, posting stringified ComponentDataByComponentKey to UI
+ * https://github.com/figma/code-snippet-editor-plugin/tree/main#component-data
  * @returns void
  */
 function performGetComponentData() {
-  const jsonString = getComponentDataJSON();
+  const components = findComponentNodesInFile();
+  const componentData: ComponentDataByComponentKey = {};
+  const data = components.reduce((into, component) => {
+    if (component.parent && component.parent.type !== "COMPONENT_SET") {
+      const lineage = [];
+      let node: BaseNode | null = component.parent;
+      if (node) {
+        while (node && node.type !== "PAGE") {
+          lineage.push(node.name);
+          node = node.parent;
+        }
+      }
+      lineage.reverse();
+      into[component.key] = {
+        name: component.name,
+        description: component.description,
+        lineage: lineage.join("/"),
+      };
+    }
+    return into;
+  }, componentData);
   figma.ui.postMessage({
     type: "COMPONENT_DATA",
-    code: jsonString,
+    code: JSON.stringify(data, null, 2),
   });
 }
 
 /**
  * Get node params for all nodes in a selection and posting data to UI
+ * https://github.com/figma/code-snippet-editor-plugin/tree/main#node-params
  * @returns Promise<void>
  */
 async function performGetNodeData() {
-  const jsonString = await getNodeDataJSON();
-  figma.ui.postMessage({
-    type: "NODE_DATA",
-    code: jsonString,
-  });
-}
-
-/**
- * Get node params for all nodes in a selection
- * @returns Promise<string> where string is stringified CodeSnippetParamsMap
- */
-async function getNodeDataJSON() {
   const nodes = figma.currentPage.selection;
   const data: { [k: string]: CodeSnippetParamsMap } = {};
   await Promise.all(
@@ -78,7 +101,10 @@ async function getNodeDataJSON() {
       return;
     })
   );
-  return JSON.stringify(data, null, 2);
+  figma.ui.postMessage({
+    type: "NODE_DATA",
+    code: JSON.stringify(data, null, 2),
+  });
 }
 
 /**
@@ -114,49 +140,4 @@ function getComponentsInFileByKey() {
   const data: ComponentsByComponentKey = {};
   components.forEach((component) => (data[component.key] = component));
   return data;
-}
-
-/**
- * Get all component data in a file as a JSON string
- * @returns stringified ComponentDataByComponentKey
- */
-function getComponentDataJSON() {
-  const components = findComponentNodesInFile();
-  const componentData: ComponentDataByComponentKey = {};
-  const data = components.reduce((into, component) => {
-    if (component.parent && component.parent.type !== "COMPONENT_SET") {
-      const lineage = [];
-      let node: BaseNode | null = component.parent;
-      if (node) {
-        while (node && node.type !== "PAGE") {
-          lineage.push(node.name);
-          node = node.parent;
-        }
-      }
-      lineage.reverse();
-      into[component.key] = {
-        name: component.name,
-        description: component.description,
-        lineage: lineage.join("/"),
-      };
-    }
-    return into;
-  }, componentData);
-  return JSON.stringify(data, null, 2);
-}
-
-/**
- * Get all component templates in the current file and return data as stringified JSON
- * @returns stringified CodegenResultTemplatesByComponentKey
- */
-function getExportJSON() {
-  const data: CodegenResultTemplatesByComponentKey = {};
-  const components = findComponentNodesInFile();
-  components.forEach((component) => {
-    const pluginData = getPluginData(component);
-    if (pluginData) {
-      data[component.key] = JSON.parse(pluginData) as CodegenResult[];
-    }
-  });
-  return JSON.stringify(data, null, 2);
 }

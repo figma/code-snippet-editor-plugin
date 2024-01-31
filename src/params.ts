@@ -2,6 +2,7 @@ import { transformStringWithFilter } from "./snippets";
 
 /**
  * Return the code snippet params for a node.
+ * https://github.com/figma/code-snippet-editor-plugin/tree/main#params
  * @param node the node we want params for
  * @param propertiesOnly a boolean flag to only return component property params
  *  (only true when getting instance swap child properties)

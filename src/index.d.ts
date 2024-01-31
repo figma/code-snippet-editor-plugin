@@ -28,6 +28,7 @@ type ComponentPropValuesMap = {
 
 /**
  * All filters for string transformation
+ * https://github.com/figma/code-snippet-editor-plugin/tree/main#filters
  */
 type SnippetStringFilter =
   | "hyphen"
@@ -44,6 +45,7 @@ interface NodeSnippetTemplateData {
   codegenResultArray: CodegenResult[];
   /**
    * CodegenResult of raw templates to be returned supplementally in "details mode"
+   * https://github.com/figma/code-snippet-editor-plugin/tree/main#details-mode
    */
   codegenResultRawTemplatesArray: CodegenResult[];
 }

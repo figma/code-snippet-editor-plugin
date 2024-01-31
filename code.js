@@ -412,55 +412,20 @@
     figma.notify(`Updated ${componentCount} Component${s}`);
   }
   function performExport() {
-    const jsonString = getExportJSON();
+    const data = {};
+    const components = findComponentNodesInFile();
+    components.forEach((component) => {
+      const pluginData = getPluginData(component);
+      if (pluginData) {
+        data[component.key] = JSON.parse(pluginData);
+      }
+    });
     figma.ui.postMessage({
       type: "EXPORT",
-      code: jsonString
+      code: JSON.stringify(data, null, 2)
     });
   }
   function performGetComponentData() {
-    const jsonString = getComponentDataJSON();
-    figma.ui.postMessage({
-      type: "COMPONENT_DATA",
-      code: jsonString
-    });
-  }
-  async function performGetNodeData() {
-    const jsonString = await getNodeDataJSON();
-    figma.ui.postMessage({
-      type: "NODE_DATA",
-      code: jsonString
-    });
-  }
-  async function getNodeDataJSON() {
-    const nodes = figma.currentPage.selection;
-    const data = {};
-    await Promise.all(
-      nodes.map(async (node) => {
-        data[keyFromNode(node)] = await paramsFromNode(node);
-        return;
-      })
-    );
-    return JSON.stringify(data, null, 2);
-  }
-  function keyFromNode(node) {
-    return `${node.name} ${node.type} ${node.id}`;
-  }
-  function findComponentNodesInFile() {
-    if (figma.currentPage.parent) {
-      return figma.currentPage.parent.findAllWithCriteria({
-        types: ["COMPONENT", "COMPONENT_SET"]
-      }) || [];
-    }
-    return [];
-  }
-  function getComponentsInFileByKey() {
-    const components = findComponentNodesInFile();
-    const data = {};
-    components.forEach((component) => data[component.key] = component);
-    return data;
-  }
-  function getComponentDataJSON() {
     const components = findComponentNodesInFile();
     const componentData = {};
     const data = components.reduce((into, component) => {
@@ -482,18 +447,41 @@
       }
       return into;
     }, componentData);
-    return JSON.stringify(data, null, 2);
-  }
-  function getExportJSON() {
-    const data = {};
-    const components = findComponentNodesInFile();
-    components.forEach((component) => {
-      const pluginData = getPluginData(component);
-      if (pluginData) {
-        data[component.key] = JSON.parse(pluginData);
-      }
+    figma.ui.postMessage({
+      type: "COMPONENT_DATA",
+      code: JSON.stringify(data, null, 2)
     });
-    return JSON.stringify(data, null, 2);
+  }
+  async function performGetNodeData() {
+    const nodes = figma.currentPage.selection;
+    const data = {};
+    await Promise.all(
+      nodes.map(async (node) => {
+        data[keyFromNode(node)] = await paramsFromNode(node);
+        return;
+      })
+    );
+    figma.ui.postMessage({
+      type: "NODE_DATA",
+      code: JSON.stringify(data, null, 2)
+    });
+  }
+  function keyFromNode(node) {
+    return `${node.name} ${node.type} ${node.id}`;
+  }
+  function findComponentNodesInFile() {
+    if (figma.currentPage.parent) {
+      return figma.currentPage.parent.findAllWithCriteria({
+        types: ["COMPONENT", "COMPONENT_SET"]
+      }) || [];
+    }
+    return [];
+  }
+  function getComponentsInFileByKey() {
+    const components = findComponentNodesInFile();
+    const data = {};
+    components.forEach((component) => data[component.key] = component);
+    return data;
   }
 
   // src/code.ts
