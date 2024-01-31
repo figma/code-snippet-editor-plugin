@@ -493,7 +493,11 @@
 
   // src/code.ts
   if (figma.mode === "codegen") {
-    console.clear();
+    initializeCodegenMode();
+  } else {
+    initializeDesignMode();
+  }
+  function initializeCodegenMode() {
     figma.codegen.on("preferenceschange", async (event) => {
       if (event.propertyName === "editor") {
         openCodeSnippetEditorUI();
@@ -533,14 +537,12 @@
             language: "JSON"
           });
         }
-        if (!snippets.length) {
-          if (hasDefaultMessage) {
-            snippets.push({
-              title: "Snippets",
-              code: "No snippets on this node. Add snippets via the Snippet Editor.",
-              language: "PLAINTEXT"
-            });
-          }
+        if (!snippets.length && hasDefaultMessage) {
+          snippets.push({
+            title: "Snippets",
+            code: "No snippets on this node. Add snippets via the Snippet Editor.",
+            language: "PLAINTEXT"
+          });
         }
         return snippets;
       } catch (e) {
@@ -549,7 +551,8 @@
         ];
       }
     });
-  } else {
+  }
+  function initializeDesignMode() {
     figma.ui.on("message", async (event) => {
       if (event.type === "INITIALIZE") {
         handleCurrentSelection();
