@@ -168,71 +168,76 @@
 
   // src/params.ts
   async function paramsFromNode(node, propertiesOnly = false) {
-    const valueObject = valueObjectFromNode(node);
-    const object = {};
-    const isDefinitions = isComponentPropertyDefinitionsObject(valueObject);
-    const instanceProperties = {};
-    for (let propertyName in valueObject) {
-      const value = isDefinitions ? valueObject[propertyName].defaultValue : valueObject[propertyName].value;
-      const type = valueObject[propertyName].type;
+    const { componentPropValuesMap, instanceParamsMap } = await componentPropertyDataFromNode(node);
+    const params = {};
+    const paramsRaw = {};
+    for (let key in componentPropValuesMap) {
+      const item = componentPropValuesMap[key];
+      const itemKeys = Object.keys(item);
+      if (itemKeys.length > 1) {
+        itemKeys.forEach((type) => {
+          const value = `${item[type]}`;
+          const lowerChar = type.charAt(0).toLowerCase();
+          params[`property.${key}.${lowerChar}`] = safeString(value);
+          paramsRaw[`property.${key}.${lowerChar}`] = value;
+        });
+      } else {
+        const value = `${item[itemKeys[0]]}`;
+        params[`property.${key}`] = safeString(value);
+        paramsRaw[`property.${key}`] = value;
+      }
+      if (itemKeys.includes("INSTANCE_SWAP") && instanceParamsMap[key]) {
+        const keyPrefix = itemKeys.length > 1 ? `property.${key}.i` : `property.${key}`;
+        for (let k in instanceParamsMap[key].params) {
+          params[`${keyPrefix}.${k}`] = safeString(
+            instanceParamsMap[key].params[k]
+          );
+          paramsRaw[`${keyPrefix}.${k}`] = instanceParamsMap[key].paramsRaw[k];
+        }
+      }
+    }
+    if (propertiesOnly) {
+      return { params, paramsRaw };
+    }
+    const initial = await initialParamsFromNode(node);
+    return {
+      params: Object.assign(params, initial.params),
+      paramsRaw: Object.assign(paramsRaw, initial.paramsRaw)
+    };
+  }
+  async function componentPropertyDataFromNode(node) {
+    const componentPropObject = componentPropObjectFromNode(node);
+    const componentPropValuesMap = {};
+    const isDefinitions = isComponentPropertyDefinitionsObject(componentPropObject);
+    const instanceParamsMap = {};
+    for (let propertyName in componentPropObject) {
+      const value = isDefinitions ? componentPropObject[propertyName].defaultValue : componentPropObject[propertyName].value;
+      const type = componentPropObject[propertyName].type;
       const cleanName = sanitizePropertyName(propertyName);
       if (value !== void 0) {
-        object[cleanName] = object[cleanName] || {};
+        componentPropValuesMap[cleanName] = componentPropValuesMap[cleanName] || {};
         if (typeof value === "string") {
           if (type === "VARIANT")
-            object[cleanName].VARIANT = value;
+            componentPropValuesMap[cleanName].VARIANT = value;
           if (type === "TEXT")
-            object[cleanName].TEXT = value;
+            componentPropValuesMap[cleanName].TEXT = value;
           if (type === "INSTANCE_SWAP") {
             const foundNode = await figma.getNodeById(value);
             const nodeName = nameFromFoundInstanceSwapNode(foundNode);
-            object[cleanName].INSTANCE_SWAP = nodeName;
+            componentPropValuesMap[cleanName].INSTANCE_SWAP = nodeName;
             if (foundNode) {
-              instanceProperties[cleanName] = await paramsFromNode(
+              instanceParamsMap[cleanName] = await paramsFromNode(
                 foundNode,
                 true
               );
             }
           }
         } else {
-          object[cleanName].BOOLEAN = value;
+          componentPropValuesMap[cleanName].BOOLEAN = value;
         }
       }
     }
-    const params = {};
-    const paramsRaw = {};
-    const initial = await initialParamsFromNode(node);
-    for (let key in object) {
-      const item = object[key];
-      const itemKeys = Object.keys(item);
-      if (itemKeys.length > 1) {
-        itemKeys.forEach((type) => {
-          const value = item[type].toString();
-          params[`property.${key}.${type.charAt(0).toLowerCase()}`] = safeString(value);
-          paramsRaw[`property.${key}.${type.charAt(0).toLowerCase()}`] = value;
-        });
-      } else {
-        const value = item[itemKeys[0]].toString();
-        params[`property.${key}`] = safeString(value);
-        paramsRaw[`property.${key}`] = value;
-      }
-      if (itemKeys.includes("INSTANCE_SWAP") && instanceProperties[key]) {
-        const keyPrefix = itemKeys.length > 1 ? `property.${key}.i` : `property.${key}`;
-        for (let k in instanceProperties[key].params) {
-          params[`${keyPrefix}.${k}`] = safeString(
-            instanceProperties[key].params[k]
-          );
-          paramsRaw[`${keyPrefix}.${k}`] = instanceProperties[key].paramsRaw[k];
-        }
-      }
-    }
-    return propertiesOnly ? {
-      params,
-      paramsRaw
-    } : {
-      params: Object.assign(params, initial.params),
-      paramsRaw: Object.assign(paramsRaw, initial.paramsRaw)
-    };
+    return { componentPropValuesMap, instanceParamsMap };
   }
   function nameFromFoundInstanceSwapNode(node) {
     return node && node.parent && node.parent.type === "COMPONENT_SET" ? node.parent.name : node ? node.name : "";
@@ -319,7 +324,7 @@
   function isComponentPropertyDefinitionsObject(object) {
     return object[Object.keys(object)[0]] && "defaultValue" in object[Object.keys(object)[0]];
   }
-  function valueObjectFromNode(node) {
+  function componentPropObjectFromNode(node) {
     if (node.type === "INSTANCE")
       return node.componentProperties;
     if (node.type === "COMPONENT_SET")
