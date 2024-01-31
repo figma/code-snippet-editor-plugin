@@ -1,61 +1,111 @@
-import { PLUGIN_DATA_KEY, PLUGIN_DATA_NAMESPACE } from "./config";
+import { getPluginData } from "./pluginData";
 
+/**
+ * Regular expression for finding symbols, aka {{property.variant}} in a string.
+ * Ignores ? and ! which indicate qualifying statements.
+ * Three groups:
+ *  1. the symbol itself
+ *  2. whole filter string
+ *  3. subset of filter string that represents the filter value
+ */
 const regexSymbols = /\{\{([^\{\?\}\|]+)(\|([^\{\?\}]+))?\}\}/g;
+/**
+ * Regular expression qualifier group string for finding "single" qualifiers aka no "&" or "|"
+ */
 const regexQualifierSingle = "([^}&|]+)";
+/**
+ * Regular expression qualifier group string for finding "OR" qualifiers aka no "&"
+ * OR is implied because the above "single" will not match.
+ */
 const regexQualifierOr = "([^}&]+)";
+/**
+ * Regular expression qualifier group string for finding "AND" qualifiers aka no "|"
+ * AND is implied because the above "single" and "or" will not match.
+ */
 const regexQualifierAnd = "([^}|]+)";
+/**
+ * Regular expression string for qualifiers, combining three group strings above into one.
+ */
 const regexQualifiers = [
   regexQualifierSingle,
   regexQualifierOr,
   regexQualifierAnd,
 ].join("|");
+/**
+ * Regular expression for qualifiers that includes above group parts.
+ * Three main groups:
+ */
 const regexQualifier = new RegExp(`\{\{([\?\!])(${regexQualifiers})\}\}`, "g");
 
-export async function snippetDataFromNode(
-  currentNode: SceneNode,
-  paramsMap: CodeSnippetParamsMap
-) {
-  const data: SnippetData[] = [];
-  const seenTemplates: { [k: string]: number } = {};
+/**
+ * Given a node, get all the relevant snippet templates stored in shared plugin data and hydrate them with params.
+ * For component-like nodes, this will discover inherited templates (component set > component > instance).
+ * @param node the node to find relevant snippets for from plugin data
+ * @param codeSnippetParamsMap the map of params that can fill the templates
+ * @returns NodeSnippetTemplateData array containing hydrated snippets for the current node.
+ */
+export async function nodeSnippetTemplateDataArrayFromNode(
+  node: SceneNode,
+  codeSnippetParamsMap: CodeSnippetParamsMap
+): Promise<NodeSnippetTemplateData[]> {
+  const nodeSnippetTemplateDataArray: NodeSnippetTemplateData[] = [];
+  const seenSnippetTemplates: { [k: string]: number } = {};
 
-  async function pluginDataForNode(node: SceneNode) {
-    const pluginData = node.getSharedPluginData(
-      PLUGIN_DATA_NAMESPACE,
-      PLUGIN_DATA_KEY
-    );
-    // skipping duplicates. why?
-    // component instances have same pluginData as mainComponent, unless they have override pluginData.
-    if (pluginData && !seenTemplates[pluginData]) {
-      seenTemplates[pluginData] = 1;
-      const { pluginDataArray, codeArray } = await hydrateSnippets(
+  /**
+   * Process snippets for any node. Called multiple times up the lineage for component and instance nodes.
+   * Instances have the same pluginData as their mainComponent, unless they have overridden the pluginData.
+   * This tracks these duplicate cases in seenSnippetTemplates and filters them out.
+   * @param node the node to check for templates in plugin data
+   * @returns Promise<void> will push into nodeSnippetTemplateDataArray.
+   */
+  async function processSnippetTemplatesForNode(node: SceneNode) {
+    const pluginData = getPluginData(node);
+    if (pluginData && !seenSnippetTemplates[pluginData]) {
+      seenSnippetTemplates[pluginData] = 1;
+      const nodeSnippetTemplateData = await hydrateSnippets(
         pluginData,
-        paramsMap
+        codeSnippetParamsMap,
+        node.type
       );
-      data.push({ codeArray, pluginDataArray, nodeType: node.type });
+      nodeSnippetTemplateDataArray.push(nodeSnippetTemplateData);
     }
   }
 
-  await pluginDataForNode(currentNode);
-  if (currentNode.type === "INSTANCE") {
-    if (currentNode.mainComponent) {
-      await pluginDataForNode(currentNode.mainComponent);
+  /**
+   * Templates on the given node
+   */
+  await processSnippetTemplatesForNode(node);
+
+  /**
+   * Templates via inheritance from component lineage
+   */
+  if (node.type === "INSTANCE") {
+    if (node.mainComponent) {
+      await processSnippetTemplatesForNode(node.mainComponent);
       if (
-        currentNode.mainComponent.parent &&
-        currentNode.mainComponent.parent.type === "COMPONENT_SET"
+        node.mainComponent.parent &&
+        node.mainComponent.parent.type === "COMPONENT_SET"
       ) {
-        await pluginDataForNode(currentNode.mainComponent.parent);
+        await processSnippetTemplatesForNode(node.mainComponent.parent);
       }
     }
   } else if (
-    currentNode.type === "COMPONENT" &&
-    currentNode.parent &&
-    currentNode.parent.type === "COMPONENT_SET"
+    node.type === "COMPONENT" &&
+    node.parent &&
+    node.parent.type === "COMPONENT_SET"
   ) {
-    await pluginDataForNode(currentNode.parent);
+    await processSnippetTemplatesForNode(node.parent);
   }
-  return data;
+
+  return nodeSnippetTemplateDataArray;
 }
 
+/**
+ * @param string the string to format
+ * @param rawString the raw form of the string (returned if filter is "raw")
+ * @param filter the snippet string filter to apply to the string
+ * @returns formatted string with filter applied
+ */
 export function formatStringWithFilter(
   string: string,
   rawString: string,
@@ -82,12 +132,21 @@ export function formatStringWithFilter(
   return splitString.join(" ");
 }
 
+/**
+ * Fill templates with code snippet params.
+ * @param pluginData string form of the snippet templates loaded from pluginData.
+ * @param codeSnippetParamsMap the map of raw and sanitized params used to hydrate the template.
+ * @returns a Promise resolving NodeSnippetTemplateData
+ */
 async function hydrateSnippets(
   pluginData: string,
-  { raw, params }: CodeSnippetParamsMap
-) {
+  codeSnippetParamsMap: CodeSnippetParamsMap,
+  nodeType: string
+): Promise<NodeSnippetTemplateData> {
+  const { paramsRaw, params } = codeSnippetParamsMap;
   const pluginDataArray = JSON.parse(pluginData) as CodegenResult[];
-  const codeArray: string[] = [];
+  const codegenResultArray: CodegenResult[] = [];
+  const codegenResultRawTemplatesArray: CodegenResult[] = [];
 
   pluginDataArray.forEach((pluginData) => {
     const lines = pluginData.code.split("\n");
@@ -108,7 +167,7 @@ async function hydrateSnippets(
           if (param in params) {
             const value = formatStringWithFilter(
               params[param],
-              raw[param],
+              paramsRaw[param],
               filter
             );
             line = line.replace(match, value);
@@ -126,23 +185,54 @@ async function hydrateSnippets(
       }
     });
 
+    /**
+     * Single line syntax collapses "/" prefix and suffix into single line spaces
+     */
     const codeString = code
       .join("\n")
       .replace(/\\\\\n/g, "") // collapse single line leading space
       .replace(/\\\n\\/g, "") // collapse single line trailing space
       .replace(/\\\n/g, " "); // collapse single line
 
-    codeArray.push(codeString);
+    codegenResultArray.push({
+      title: pluginData.title,
+      language: pluginData.language,
+      code: codeString,
+    });
+
+    codegenResultRawTemplatesArray.push({
+      title: `${pluginData.title}: Template (${nodeType})`,
+      language: "PLAINTEXT",
+      code: pluginData.code,
+    });
   });
 
-  return { params, pluginDataArray, codeArray };
+  return {
+    codegenResultRawTemplatesArray,
+    codegenResultArray,
+  };
 }
 
+/**
+ * Handling any qualifying statements and  on a line of a template and determining whether or not to render.
+ * No qualifying statements is valid, and the line should render.
+ * This only checks for qualifying statements, symbols can still invalidate the line if the params dont exist.
+ * @param line the line of snippet template to validate
+ * @param params the params to use to validate or invalidate the line based on a qualifying statement.
+ * @returns array of the line's qualifing statements as RegExpMatchArray, and whether or not the line can render.
+ */
 function lineQualifierMatch(
   line: string,
   params: CodeSnippetParams
 ): [RegExpMatchArray[], boolean] {
-  // Line qualifier statement. {{?something=value}} | {{!something=value}} | {{?something}}
+  /**
+   * Line qualifier statement matches.
+   * {{?something=value}}
+   * {{!something=value}}
+   * {{?something}}
+   * {{?something=value|something=other}}
+   * {{?something=value&other=value}}
+   */
   const matches = [...line.matchAll(regexQualifier)];
 
   // No qualifier statement on the line. This is valid.

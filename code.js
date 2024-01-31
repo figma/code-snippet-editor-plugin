@@ -1,8 +1,14 @@
 "use strict";
 (() => {
-  // src/config.ts
+  // src/pluginData.ts
   var PLUGIN_DATA_NAMESPACE = "codesnippets";
   var PLUGIN_DATA_KEY = "snippets";
+  function getPluginData(node) {
+    return node.getSharedPluginData(PLUGIN_DATA_NAMESPACE, PLUGIN_DATA_KEY);
+  }
+  function setPluginData(node, data) {
+    return node.setSharedPluginData(PLUGIN_DATA_NAMESPACE, PLUGIN_DATA_KEY, data);
+  }
 
   // src/snippets.ts
   var regexSymbols = /\{\{([^\{\?\}\|]+)(\|([^\{\?\}]+))?\}\}/g;
@@ -15,58 +21,58 @@
     regexQualifierAnd
   ].join("|");
   var regexQualifier = new RegExp(`{{([?!])(${regexQualifiers})}}`, "g");
-  async function snippetDataFromNode(currentNode, paramsMap) {
-    const data = [];
-    const seenTemplates = {};
-    async function pluginDataForNode(node) {
-      const pluginData = node.getSharedPluginData(
-        PLUGIN_DATA_NAMESPACE,
-        PLUGIN_DATA_KEY
-      );
-      if (pluginData && !seenTemplates[pluginData]) {
-        seenTemplates[pluginData] = 1;
-        const { pluginDataArray, codeArray } = await hydrateSnippets(
+  async function nodeSnippetTemplateDataArrayFromNode(node, codeSnippetParamsMap) {
+    const nodeSnippetTemplateDataArray = [];
+    const seenSnippetTemplates = {};
+    async function processSnippetTemplatesForNode(node2) {
+      const pluginData = getPluginData(node2);
+      if (pluginData && !seenSnippetTemplates[pluginData]) {
+        seenSnippetTemplates[pluginData] = 1;
+        const nodeSnippetTemplateData = await hydrateSnippets(
           pluginData,
-          paramsMap
+          codeSnippetParamsMap,
+          node2.type
         );
-        data.push({ codeArray, pluginDataArray, nodeType: node.type });
+        nodeSnippetTemplateDataArray.push(nodeSnippetTemplateData);
       }
     }
-    await pluginDataForNode(currentNode);
-    if (currentNode.type === "INSTANCE") {
-      if (currentNode.mainComponent) {
-        await pluginDataForNode(currentNode.mainComponent);
-        if (currentNode.mainComponent.parent && currentNode.mainComponent.parent.type === "COMPONENT_SET") {
-          await pluginDataForNode(currentNode.mainComponent.parent);
+    await processSnippetTemplatesForNode(node);
+    if (node.type === "INSTANCE") {
+      if (node.mainComponent) {
+        await processSnippetTemplatesForNode(node.mainComponent);
+        if (node.mainComponent.parent && node.mainComponent.parent.type === "COMPONENT_SET") {
+          await processSnippetTemplatesForNode(node.mainComponent.parent);
         }
       }
-    } else if (currentNode.type === "COMPONENT" && currentNode.parent && currentNode.parent.type === "COMPONENT_SET") {
-      await pluginDataForNode(currentNode.parent);
+    } else if (node.type === "COMPONENT" && node.parent && node.parent.type === "COMPONENT_SET") {
+      await processSnippetTemplatesForNode(node.parent);
     }
-    return data;
+    return nodeSnippetTemplateDataArray;
   }
   function formatStringWithFilter(string, rawString, filter = "hyphen") {
-    const splitString2 = string.split("-");
+    const splitString = string.split("-");
     const capitalize2 = (s) => s.charAt(0).toUpperCase() + s.substring(1);
     switch (filter) {
       case "camel":
-        return splitString2.map((word, i) => i === 0 ? word : capitalize2(word)).join("");
+        return splitString.map((word, i) => i === 0 ? word : capitalize2(word)).join("");
       case "constant":
-        return splitString2.join("_").toUpperCase();
+        return splitString.join("_").toUpperCase();
       case "hyphen":
-        return splitString2.join("-").toLowerCase();
+        return splitString.join("-").toLowerCase();
       case "pascal":
-        return splitString2.map(capitalize2).join("");
+        return splitString.map(capitalize2).join("");
       case "raw":
         return rawString;
       case "snake":
-        return splitString2.join("_").toLowerCase();
+        return splitString.join("_").toLowerCase();
     }
-    return splitString2.join(" ");
+    return splitString.join(" ");
   }
-  async function hydrateSnippets(pluginData, { raw, params }) {
+  async function hydrateSnippets(pluginData, codeSnippetParamsMap, nodeType) {
+    const { paramsRaw, params } = codeSnippetParamsMap;
     const pluginDataArray = JSON.parse(pluginData);
-    const codeArray = [];
+    const codegenResultArray = [];
+    const codegenResultRawTemplatesArray = [];
     pluginDataArray.forEach((pluginData2) => {
       const lines = pluginData2.code.split("\n");
       const code = [];
@@ -85,7 +91,7 @@
             if (param in params) {
               const value = formatStringWithFilter(
                 params[param],
-                raw[param],
+                paramsRaw[param],
                 filter
               );
               line = line.replace(match, value);
@@ -103,9 +109,21 @@
         }
       });
       const codeString = code.join("\n").replace(/\\\\\n/g, "").replace(/\\\n\\/g, "").replace(/\\\n/g, " ");
-      codeArray.push(codeString);
+      codegenResultArray.push({
+        title: pluginData2.title,
+        language: pluginData2.language,
+        code: codeString
+      });
+      codegenResultRawTemplatesArray.push({
+        title: `${pluginData2.title}: Template (${nodeType})`,
+        language: "PLAINTEXT",
+        code: pluginData2.code
+      });
     });
-    return { params, pluginDataArray, codeArray };
+    return {
+      codegenResultRawTemplatesArray,
+      codegenResultArray
+    };
   }
   function lineQualifierMatch(line, params) {
     const matches = [...line.matchAll(regexQualifier)];
@@ -182,7 +200,7 @@
       }
     }
     const params = {};
-    const raw = {};
+    const paramsRaw = {};
     const initial = await initialParamsFromNode(node);
     for (let key in object) {
       const item = object[key];
@@ -190,30 +208,30 @@
       if (itemKeys.length > 1) {
         itemKeys.forEach((type) => {
           const value = item[type].toString();
-          params[`property.${key}.${type.charAt(0).toLowerCase()}`] = splitString(value);
-          raw[`property.${key}.${type.charAt(0).toLowerCase()}`] = value;
+          params[`property.${key}.${type.charAt(0).toLowerCase()}`] = safeString(value);
+          paramsRaw[`property.${key}.${type.charAt(0).toLowerCase()}`] = value;
         });
       } else {
         const value = item[itemKeys[0]].toString();
-        params[`property.${key}`] = splitString(value);
-        raw[`property.${key}`] = value;
+        params[`property.${key}`] = safeString(value);
+        paramsRaw[`property.${key}`] = value;
       }
       if (itemKeys.includes("INSTANCE_SWAP") && instanceProperties[key]) {
         const keyPrefix = itemKeys.length > 1 ? `property.${key}.i` : `property.${key}`;
         for (let k in instanceProperties[key].params) {
-          params[`${keyPrefix}.${k}`] = splitString(
+          params[`${keyPrefix}.${k}`] = safeString(
             instanceProperties[key].params[k]
           );
-          raw[`${keyPrefix}.${k}`] = instanceProperties[key].raw[k];
+          paramsRaw[`${keyPrefix}.${k}`] = instanceProperties[key].paramsRaw[k];
         }
       }
     }
     return propertiesOnly ? {
       params,
-      raw
+      paramsRaw
     } : {
       params: Object.assign(params, initial.params),
-      raw: Object.assign(raw, initial.raw)
+      paramsRaw: Object.assign(paramsRaw, initial.paramsRaw)
     };
   }
   function nameFromFoundInstanceSwapNode(node) {
@@ -223,30 +241,30 @@
     const componentNode = getComponentNodeFromNode(node);
     const css = await node.getCSSAsync();
     const autolayout = "inferredAutoLayout" in node ? node.inferredAutoLayout : void 0;
-    const raw = {
+    const paramsRaw = {
       "node.name": node.name,
       "node.type": node.type
     };
     const params = {
-      "node.name": splitString(node.name),
-      "node.type": splitString(node.type)
+      "node.name": safeString(node.name),
+      "node.type": safeString(node.type)
     };
     if ("key" in node) {
-      raw["node.key"] = node.key;
+      paramsRaw["node.key"] = node.key;
       params["node.key"] = node.key;
     }
     if (componentNode && "key" in componentNode) {
-      raw["component.key"] = componentNode.key;
-      raw["component.type"] = componentNode.type;
-      raw["component.name"] = componentNode.name;
+      paramsRaw["component.key"] = componentNode.key;
+      paramsRaw["component.type"] = componentNode.type;
+      paramsRaw["component.name"] = componentNode.name;
       params["component.key"] = componentNode.key;
-      params["component.type"] = splitString(componentNode.type);
-      params["component.name"] = splitString(componentNode.name);
+      params["component.type"] = safeString(componentNode.type);
+      params["component.name"] = safeString(componentNode.name);
     }
     for (let key in css) {
       const k = formatStringWithFilter(key, key, "camel");
       params[`css.${k}`] = css[key];
-      raw[`css.${k}`] = css[key];
+      paramsRaw[`css.${k}`] = css[key];
     }
     if ("boundVariables" in node && node.boundVariables) {
       const boundVariables = node.boundVariables;
@@ -259,15 +277,15 @@
           vars.forEach((v) => {
             const va = figma.variables.getVariableById(v.id);
             if (va) {
-              raw[`variables.${key}`] = va.name;
-              params[`variables.${key}`] = splitString(va.name);
+              paramsRaw[`variables.${key}`] = va.name;
+              params[`variables.${key}`] = safeString(va.name);
               for (let syntax in va.codeSyntax) {
                 const syntaxKey = syntax.charAt(0).toLowerCase();
                 const syntaxName = syntax;
                 const value = va.codeSyntax[syntaxName];
                 if (value) {
-                  raw[`variables.${key}.${syntaxKey}`] = value;
-                  params[`variables.${key}.${syntaxKey}`] = splitString(value);
+                  paramsRaw[`variables.${key}.${syntaxKey}`] = value;
+                  params[`variables.${key}.${syntaxKey}`] = safeString(value);
                 }
               }
             }
@@ -291,12 +309,12 @@
       props.forEach((p) => {
         const val = autolayout[p] + "";
         if (val !== "undefined" && val !== "null") {
-          raw[`autolayout.${p}`] = val;
-          params[`autolayout.${p}`] = splitString(val);
+          paramsRaw[`autolayout.${p}`] = val;
+          params[`autolayout.${p}`] = safeString(val);
         }
       });
     }
-    return { params, raw };
+    return { params, paramsRaw };
   }
   function isComponentPropertyDefinitionsObject(object) {
     return object[Object.keys(object)[0]] && "defaultValue" in object[Object.keys(object)[0]];
@@ -350,14 +368,15 @@
     const isVariant = parentType === "COMPONENT_SET";
     if (type === "COMPONENT_SET" || type === "COMPONENT" && !isVariant) {
       return node;
-    } else if (type === "COMPONENT" && isVariant) {
-      return parent;
+    } else if (node.type === "COMPONENT" && node.parent && node.parent.type === "COMPONENT_SET") {
+      return node.parent;
     } else if (type === "INSTANCE") {
       const { mainComponent } = node;
       return mainComponent ? mainComponent.parent && mainComponent.parent.type === "COMPONENT_SET" ? mainComponent.parent : mainComponent : null;
     }
+    return null;
   }
-  function splitString(string = "") {
+  function safeString(string = "") {
     string = string.replace(/([^a-zA-Z0-9-_// ])/g, "");
     if (!string.match(/^[A-Z0-9_]+$/)) {
       string = string.replace(/([A-Z])/g, " $1");
@@ -366,7 +385,13 @@
   }
 
   // src/bulk.ts
-  function bulkImport(eventData) {
+  var bulk = {
+    performImport,
+    performExport,
+    performGetComponentData,
+    performGetNodeData
+  };
+  function performImport(eventData) {
     const componentsByKey = getComponentsInFileByKey();
     const data = JSON.parse(eventData);
     let componentCount = 0;
@@ -375,31 +400,27 @@
       const component = componentsByKey[componentKey];
       if (component) {
         componentCount++;
-        component.setSharedPluginData(
-          PLUGIN_DATA_NAMESPACE,
-          PLUGIN_DATA_KEY,
-          dataToSave
-        );
+        setPluginData(component, dataToSave);
       }
     }
     const s = componentCount === 1 ? "" : "s";
     figma.notify(`Updated ${componentCount} Component${s}`);
   }
-  function bulkExport() {
+  function performExport() {
     const jsonString = getExportJSON();
     figma.ui.postMessage({
       type: "EXPORT",
       code: jsonString
     });
   }
-  function bulkGetComponentData() {
+  function performGetComponentData() {
     const jsonString = getComponentDataJSON();
     figma.ui.postMessage({
       type: "COMPONENT_DATA",
       code: jsonString
     });
   }
-  async function bulkGetNodeData() {
+  async function performGetNodeData() {
     const jsonString = await getNodeDataJSON();
     figma.ui.postMessage({
       type: "NODE_DATA",
@@ -462,10 +483,7 @@
     const data = {};
     const components = findComponentNodesInFile();
     components.forEach((component) => {
-      const pluginData = component.getSharedPluginData(
-        PLUGIN_DATA_NAMESPACE,
-        PLUGIN_DATA_KEY
-      );
+      const pluginData = getPluginData(component);
       if (pluginData) {
         data[component.key] = JSON.parse(pluginData);
       }
@@ -485,11 +503,7 @@
       if (event.type === "INITIALIZE") {
         handleCurrentSelection();
       } else if (event.type === "SAVE") {
-        figma.currentPage.selection[0].setSharedPluginData(
-          PLUGIN_DATA_NAMESPACE,
-          PLUGIN_DATA_KEY,
-          event.data
-        );
+        setPluginData(figma.currentPage.selection[0], event.data);
       } else {
         console.log("UNKNOWN EVENT", event);
       }
@@ -502,9 +516,9 @@
         const hasDefaultMessage = defaultSnippet === "message";
         const currentNode = handleCurrentSelection();
         const paramsMap = await paramsFromNode(currentNode);
-        const snippetData = await snippetDataFromNode(currentNode, paramsMap);
-        const snippets = codegenResultsFromSnippetData(
-          snippetData,
+        const nodeSnippetTemplateDataArray = await nodeSnippetTemplateDataArrayFromNode(currentNode, paramsMap);
+        const snippets = codegenResultsFromNodeSnippetTemplateDataArray(
+          nodeSnippetTemplateDataArray,
           isDetailsMode
         );
         if (isDetailsMode) {
@@ -515,7 +529,7 @@
           });
           snippets.push({
             title: "Node Params (Raw)",
-            code: JSON.stringify(paramsMap.raw, null, 2),
+            code: JSON.stringify(paramsMap.paramsRaw, null, 2),
             language: "JSON"
           });
         }
@@ -540,13 +554,13 @@
       if (event.type === "INITIALIZE") {
         handleCurrentSelection();
       } else if (event.type === "COMPONENT_DATA") {
-        bulkGetComponentData();
+        bulk.performGetComponentData();
       } else if (event.type === "NODE_DATA") {
-        await bulkGetNodeData();
+        await bulk.performGetNodeData();
       } else if (event.type === "EXPORT") {
-        bulkExport();
+        bulk.performExport();
       } else if (event.type === "IMPORT") {
-        bulkImport(event.data);
+        bulk.performImport(event.data);
       }
     });
     figma.showUI(__uiFiles__.bulk, {
@@ -571,28 +585,25 @@
       themeColors: true
     });
   }
-  function codegenResultsFromSnippetData(snippetData, isDetailsMode) {
+  function codegenResultsFromNodeSnippetTemplateDataArray(nodeSnippetTemplateDataArray, isDetailsMode) {
     const codegenResult = [];
-    snippetData.forEach((pluginDataAndParams) => {
-      const { codeArray, pluginDataArray, nodeType } = pluginDataAndParams;
-      pluginDataArray.forEach(({ title, code: templateCode, language }, i) => {
-        const code = codeArray[i];
-        if (isDetailsMode) {
-          codegenResult.push({
-            title: `${title}: Template (${nodeType})`,
-            code: templateCode,
-            language: "PLAINTEXT"
-          });
-        }
-        codegenResult.push({ title, language, code });
-      });
+    nodeSnippetTemplateDataArray.forEach((nodeSnippetTemplateData) => {
+      const { codegenResultArray, codegenResultRawTemplatesArray } = nodeSnippetTemplateData;
+      if (isDetailsMode) {
+        codegenResultArray.forEach((result, i) => {
+          codegenResult.push(codegenResultRawTemplatesArray[i]);
+          codegenResult.push(result);
+        });
+      } else {
+        codegenResult.push(...codegenResultArray);
+      }
     });
     return codegenResult;
   }
   function handleCurrentSelection() {
     const node = figma.currentPage.selection[0];
     try {
-      const nodePluginData = node ? node.getSharedPluginData(PLUGIN_DATA_NAMESPACE, PLUGIN_DATA_KEY) : null;
+      const nodePluginData = node ? getPluginData(node) : null;
       const nodeId = node ? node.id : null;
       const nodeType = node ? node.type : null;
       figma.ui.postMessage({

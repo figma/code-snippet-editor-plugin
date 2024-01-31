@@ -1,6 +1,15 @@
 import { formatStringWithFilter } from "./snippets";
 
-export async function paramsFromNode(node: BaseNode, propertiesOnly = false) {
+/**
+ * Return the code snippet params for a node.
+ * @param node the node we want params for
+ * @param propertiesOnly a boolean flag to only return component property params (only true when getting instance swap child properties)
+ * @returns Promise that resolves a CodeSnippetParamsMap
+ */
+export async function paramsFromNode(
+  node: BaseNode,
+  propertiesOnly = false
+): Promise<CodeSnippetParamsMap> {
   const valueObject = valueObjectFromNode(node);
   const object: {
     [k: string]: {
@@ -40,7 +49,7 @@ export async function paramsFromNode(node: BaseNode, propertiesOnly = false) {
     }
   }
   const params: CodeSnippetParams = {};
-  const raw: CodeSnippetParams = {};
+  const paramsRaw: CodeSnippetParams = {};
   const initial = await initialParamsFromNode(node);
   for (let key in object) {
     const item = object[key];
@@ -54,22 +63,22 @@ export async function paramsFromNode(node: BaseNode, propertiesOnly = false) {
       itemKeys.forEach((type) => {
         const value = item[type].toString();
         params[`property.${key}.${type.charAt(0).toLowerCase()}`] =
-          splitString(value);
-        raw[`property.${key}.${type.charAt(0).toLowerCase()}`] = value;
+          safeString(value);
+        paramsRaw[`property.${key}.${type.charAt(0).toLowerCase()}`] = value;
       });
     } else {
       const value = item[itemKeys[0]].toString();
-      params[`property.${key}`] = splitString(value);
-      raw[`property.${key}`] = value;
+      params[`property.${key}`] = safeString(value);
+      paramsRaw[`property.${key}`] = value;
     }
     if (itemKeys.includes("INSTANCE_SWAP") && instanceProperties[key]) {
       const keyPrefix =
         itemKeys.length > 1 ? `property.${key}.i` : `property.${key}`;
       for (let k in instanceProperties[key].params) {
-        params[`${keyPrefix}.${k}`] = splitString(
+        params[`${keyPrefix}.${k}`] = safeString(
           instanceProperties[key].params[k]
         );
-        raw[`${keyPrefix}.${k}`] = instanceProperties[key].raw[k];
+        paramsRaw[`${keyPrefix}.${k}`] = instanceProperties[key].paramsRaw[k];
       }
     }
   }
@@ -77,14 +86,19 @@ export async function paramsFromNode(node: BaseNode, propertiesOnly = false) {
   return propertiesOnly
     ? {
         params,
-        raw,
+        paramsRaw,
       }
     : {
         params: Object.assign(params, initial.params),
-        raw: Object.assign(raw, initial.raw),
+        paramsRaw: Object.assign(paramsRaw, initial.paramsRaw),
       };
 }
 
+/**
+ * Find the appropriate component name for an instance swap instance node
+ * @param node implicitly an instance node to find a name for
+ * @returns a name as a string
+ */
 function nameFromFoundInstanceSwapNode(node: BaseNode | null) {
   return node && node.parent && node.parent.type === "COMPONENT_SET"
     ? node.parent.name
@@ -93,35 +107,43 @@ function nameFromFoundInstanceSwapNode(node: BaseNode | null) {
     : "";
 }
 
-async function initialParamsFromNode(node: BaseNode) {
+/**
+ * Generate initial CodeSnippetParamsMap for a node, including autolayout, node, component, css, and variables.
+ * Component property params are combined with this map later.
+ * @param node node to generate initial params for
+ * @returns Promise resolving an initial CodeSnippetParamsMap for the provided node
+ */
+async function initialParamsFromNode(
+  node: BaseNode
+): Promise<CodeSnippetParamsMap> {
   const componentNode = getComponentNodeFromNode(node);
   const css = await node.getCSSAsync();
   const autolayout =
     "inferredAutoLayout" in node ? node.inferredAutoLayout : undefined;
-  const raw: CodeSnippetParams = {
+  const paramsRaw: CodeSnippetParams = {
     "node.name": node.name,
     "node.type": node.type,
   };
   const params: CodeSnippetParams = {
-    "node.name": splitString(node.name),
-    "node.type": splitString(node.type),
+    "node.name": safeString(node.name),
+    "node.type": safeString(node.type),
   };
   if ("key" in node) {
-    raw["node.key"] = node.key;
+    paramsRaw["node.key"] = node.key;
     params["node.key"] = node.key;
   }
   if (componentNode && "key" in componentNode) {
-    raw["component.key"] = componentNode.key;
-    raw["component.type"] = componentNode.type;
-    raw["component.name"] = componentNode.name;
+    paramsRaw["component.key"] = componentNode.key;
+    paramsRaw["component.type"] = componentNode.type;
+    paramsRaw["component.name"] = componentNode.name;
     params["component.key"] = componentNode.key;
-    params["component.type"] = splitString(componentNode.type);
-    params["component.name"] = splitString(componentNode.name);
+    params["component.type"] = safeString(componentNode.type);
+    params["component.name"] = safeString(componentNode.name);
   }
   for (let key in css) {
     const k = formatStringWithFilter(key, key, "camel");
     params[`css.${k}`] = css[key];
-    raw[`css.${k}`] = css[key];
+    paramsRaw[`css.${k}`] = css[key];
   }
   if ("boundVariables" in node && node.boundVariables) {
     const boundVariables: SceneNodeMixin["boundVariables"] =
@@ -136,15 +158,15 @@ async function initialParamsFromNode(node: BaseNode) {
         vars.forEach((v) => {
           const va = figma.variables.getVariableById(v.id);
           if (va) {
-            raw[`variables.${key}`] = va.name;
-            params[`variables.${key}`] = splitString(va.name);
+            paramsRaw[`variables.${key}`] = va.name;
+            params[`variables.${key}`] = safeString(va.name);
             for (let syntax in va.codeSyntax) {
               const syntaxKey = syntax.charAt(0).toLowerCase();
               const syntaxName = syntax as "WEB" | "ANDROID" | "iOS";
               const value = va.codeSyntax[syntaxName];
               if (value) {
-                raw[`variables.${key}.${syntaxKey}`] = value;
-                params[`variables.${key}.${syntaxKey}`] = splitString(value);
+                paramsRaw[`variables.${key}.${syntaxKey}`] = value;
+                params[`variables.${key}.${syntaxKey}`] = safeString(value);
               }
             }
           }
@@ -168,14 +190,20 @@ async function initialParamsFromNode(node: BaseNode) {
     props.forEach((p) => {
       const val = autolayout[p] + "";
       if (val !== "undefined" && val !== "null") {
-        raw[`autolayout.${p}`] = val;
-        params[`autolayout.${p}`] = splitString(val);
+        paramsRaw[`autolayout.${p}`] = val;
+        params[`autolayout.${p}`] = safeString(val);
       }
     });
   }
-  return { params, raw };
+  return { params, paramsRaw };
 }
 
+/**
+ * A util for typesafety that determines if an object
+ *  that can be ComponentProperties or ComponentPropertyDefinitions is the latter
+ * @param object the object in question, ComponentProperties or ComponentPropertyDefinitions
+ * @returns whether or not the object is ComponentProperties or ComponentPropertyDefinitions
+ */
 function isComponentPropertyDefinitionsObject(
   object: ComponentProperties | ComponentPropertyDefinitions
 ): object is ComponentPropertyDefinitions {
@@ -185,6 +213,11 @@ function isComponentPropertyDefinitionsObject(
   );
 }
 
+/**
+ * Finding the right component property value object from the current node.
+ * @param node the node in question, ignored if not component-like.
+ * @returns ComponentProperties or ComponentPropertyDefinitions
+ */
 function valueObjectFromNode(
   node: BaseNode
 ): ComponentProperties | ComponentPropertyDefinitions {
@@ -209,19 +242,41 @@ function valueObjectFromNode(
   return {};
 }
 
+/**
+ * Uppercase the first character in a string
+ * @param name the string to capitalize
+ * @returns capitalized string
+ */
 function capitalize(name: string) {
   return `${name.charAt(0).toUpperCase()}${name.slice(1)}`;
 }
 
+/**
+ * Lowercase the first character in a string
+ * @param name the string to downcase
+ * @returns downcased string
+ */
 function downcase(name: string) {
   return `${name.charAt(0).toLowerCase()}${name.slice(1)}`;
 }
+
+/**
+ * Ensure a string does not start with a number
+ * @param name the string to guard that can start with a number
+ * @returns string that starts with a letter
+ */
 function numericGuard(name = "") {
   if (name.charAt(0).match(/\d/)) {
     name = `N${name}`;
   }
   return name;
 }
+
+/**
+ * Transform a string into a proper capitalized string that cannot start with a number
+ * @param name the string to capitalize
+ * @returns capitalized name
+ */
 function capitalizedNameFromName(name = "") {
   name = numericGuard(name);
   return name
@@ -230,19 +285,35 @@ function capitalizedNameFromName(name = "") {
     .join("");
 }
 
+/**
+ * A clean property name from a potentially gross string
+ * @param name the name to sanitize
+ * @returns a sanitized string
+ */
 function sanitizePropertyName(name: string) {
   name = name.replace(/#[^#]+$/g, "");
   return downcase(capitalizedNameFromName(name).replace(/^\d+/g, ""));
 }
 
-function getComponentNodeFromNode(node: BaseNode) {
+/**
+ * Get the appropriate topmost component node for a given node
+ * @param node node to find the right component node for
+ * @returns a component or component set node if it exists, otherwise null
+ */
+function getComponentNodeFromNode(
+  node: BaseNode
+): ComponentNode | ComponentSetNode | null {
   const { type, parent } = node;
   const parentType = parent ? parent.type : "";
   const isVariant = parentType === "COMPONENT_SET";
   if (type === "COMPONENT_SET" || (type === "COMPONENT" && !isVariant)) {
     return node;
-  } else if (type === "COMPONENT" && isVariant) {
-    return parent;
+  } else if (
+    node.type === "COMPONENT" &&
+    node.parent &&
+    node.parent.type === "COMPONENT_SET"
+  ) {
+    return node.parent;
   } else if (type === "INSTANCE") {
     const { mainComponent } = node;
     return mainComponent
@@ -251,9 +322,15 @@ function getComponentNodeFromNode(node: BaseNode) {
         : mainComponent
       : null;
   }
+  return null;
 }
 
-function splitString(string = "") {
+/**
+ * Turn any string into a safe, hyphenated lowercase string
+ * @param string the string to transform
+ * @returns the safe string
+ */
+function safeString(string = "") {
   string = string.replace(/([^a-zA-Z0-9-_// ])/g, "");
   if (!string.match(/^[A-Z0-9_]+$/)) {
     string = string.replace(/([A-Z])/g, " $1");
@@ -266,24 +343,4 @@ function splitString(string = "") {
     .toLowerCase()
     .split(" ")
     .join("-");
-}
-
-function optionNameFromVariant(name = "") {
-  const clean = name.replace(/[^a-zA-Z\d-_ ]/g, "");
-  if (clean.match("-")) {
-    return clean.replace(/ +/g, "-").toLowerCase();
-  } else if (clean.match("_")) {
-    return clean.replace(/ +/g, "_").toLowerCase();
-  } else if (clean.match(" ") || clean.match(/^[A-Z]/)) {
-    return clean
-      .split(/ +/)
-      .map((a, i) => {
-        let text =
-          i > 0
-            ? `${a.charAt(0).toUpperCase()}${a.substring(1).toLowerCase()}`
-            : a.toLowerCase();
-        return text;
-      })
-      .join("");
-  } else return clean;
 }

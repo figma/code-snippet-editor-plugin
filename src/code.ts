@@ -1,12 +1,7 @@
-import { PLUGIN_DATA_KEY, PLUGIN_DATA_NAMESPACE } from "./config";
+import { bulk } from "./bulk";
+import { getPluginData, setPluginData } from "./pluginData";
 import { paramsFromNode } from "./params";
-import {
-  bulkExport,
-  bulkGetComponentData,
-  bulkGetNodeData,
-  bulkImport,
-} from "./bulk";
-import { snippetDataFromNode } from "./snippets";
+import { nodeSnippetTemplateDataArrayFromNode } from "./snippets";
 
 if (figma.mode === "codegen") {
   console.clear();
@@ -21,11 +16,7 @@ if (figma.mode === "codegen") {
     if (event.type === "INITIALIZE") {
       handleCurrentSelection();
     } else if (event.type === "SAVE") {
-      figma.currentPage.selection[0].setSharedPluginData(
-        PLUGIN_DATA_NAMESPACE,
-        PLUGIN_DATA_KEY,
-        event.data
-      );
+      setPluginData(figma.currentPage.selection[0], event.data);
     } else {
       console.log("UNKNOWN EVENT", event);
     }
@@ -42,10 +33,11 @@ if (figma.mode === "codegen") {
       const currentNode = handleCurrentSelection();
 
       const paramsMap = await paramsFromNode(currentNode);
-      const snippetData = await snippetDataFromNode(currentNode, paramsMap);
+      const nodeSnippetTemplateDataArray =
+        await nodeSnippetTemplateDataArrayFromNode(currentNode, paramsMap);
 
-      const snippets = codegenResultsFromSnippetData(
-        snippetData,
+      const snippets = codegenResultsFromNodeSnippetTemplateDataArray(
+        nodeSnippetTemplateDataArray,
         isDetailsMode
       );
 
@@ -57,7 +49,7 @@ if (figma.mode === "codegen") {
         });
         snippets.push({
           title: "Node Params (Raw)",
-          code: JSON.stringify(paramsMap.raw, null, 2),
+          code: JSON.stringify(paramsMap.paramsRaw, null, 2),
           language: "JSON",
         });
       }
@@ -84,13 +76,13 @@ if (figma.mode === "codegen") {
     if (event.type === "INITIALIZE") {
       handleCurrentSelection();
     } else if (event.type === "COMPONENT_DATA") {
-      bulkGetComponentData();
+      bulk.performGetComponentData();
     } else if (event.type === "NODE_DATA") {
-      await bulkGetNodeData();
+      await bulk.performGetNodeData();
     } else if (event.type === "EXPORT") {
-      bulkExport();
+      bulk.performExport();
     } else if (event.type === "IMPORT") {
-      bulkImport(event.data);
+      bulk.performImport(event.data);
     }
   });
 
@@ -118,24 +110,25 @@ function openCodeSnippetEditorUI() {
   });
 }
 
-function codegenResultsFromSnippetData(
-  snippetData: SnippetData[],
+function codegenResultsFromNodeSnippetTemplateDataArray(
+  nodeSnippetTemplateDataArray: NodeSnippetTemplateData[],
   isDetailsMode: boolean
 ) {
   const codegenResult: CodegenResult[] = [];
-  snippetData.forEach((pluginDataAndParams) => {
-    const { codeArray, pluginDataArray, nodeType } = pluginDataAndParams;
-    pluginDataArray.forEach(({ title, code: templateCode, language }, i) => {
-      const code = codeArray[i];
-      if (isDetailsMode) {
-        codegenResult.push({
-          title: `${title}: Template (${nodeType})`,
-          code: templateCode,
-          language: "PLAINTEXT",
-        });
-      }
-      codegenResult.push({ title, language, code });
-    });
+  nodeSnippetTemplateDataArray.forEach((nodeSnippetTemplateData) => {
+    const { codegenResultArray, codegenResultRawTemplatesArray } =
+      nodeSnippetTemplateData;
+    if (isDetailsMode) {
+      /**
+       * If details mode, interleave raw template between rendered snippets
+       */
+      codegenResultArray.forEach((result, i) => {
+        codegenResult.push(codegenResultRawTemplatesArray[i]);
+        codegenResult.push(result);
+      });
+    } else {
+      codegenResult.push(...codegenResultArray);
+    }
   });
   return codegenResult;
 }
@@ -143,9 +136,7 @@ function codegenResultsFromSnippetData(
 function handleCurrentSelection() {
   const node = figma.currentPage.selection[0];
   try {
-    const nodePluginData = node
-      ? node.getSharedPluginData(PLUGIN_DATA_NAMESPACE, PLUGIN_DATA_KEY)
-      : null;
+    const nodePluginData = node ? getPluginData(node) : null;
     const nodeId = node ? node.id : null;
     const nodeType = node ? node.type : null;
     figma.ui.postMessage({
