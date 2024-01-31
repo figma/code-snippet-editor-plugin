@@ -1,4 +1,4 @@
-import { formatStringWithFilter } from "./snippets";
+import { transformStringWithFilter } from "./snippets";
 
 /**
  * Return the code snippet params for a node.
@@ -141,7 +141,7 @@ async function initialParamsFromNode(
     params["component.name"] = safeString(componentNode.name);
   }
   for (let key in css) {
-    const k = formatStringWithFilter(key, key, "camel");
+    const k = transformStringWithFilter(key, key, "camel");
     params[`css.${k}`] = css[key];
     paramsRaw[`css.${k}`] = css[key];
   }

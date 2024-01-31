@@ -101,12 +101,12 @@ export async function nodeSnippetTemplateDataArrayFromNode(
 }
 
 /**
- * @param string the string to format
+ * @param string the string to transform
  * @param rawString the raw form of the string (returned if filter is "raw")
  * @param filter the snippet string filter to apply to the string
- * @returns formatted string with filter applied
+ * @returns transformed string with filter applied
  */
-export function formatStringWithFilter(
+export function transformStringWithFilter(
   string: string,
   rawString: string,
   filter: SnippetStringFilter = "hyphen"
@@ -165,7 +165,7 @@ async function hydrateSnippets(
             a ? a.trim() : a
           ) as [string, string, string, SnippetStringFilter];
           if (param in params) {
-            const value = formatStringWithFilter(
+            const value = transformStringWithFilter(
               params[param],
               paramsRaw[param],
               filter

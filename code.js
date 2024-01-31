@@ -49,7 +49,7 @@
     }
     return nodeSnippetTemplateDataArray;
   }
-  function formatStringWithFilter(string, rawString, filter = "hyphen") {
+  function transformStringWithFilter(string, rawString, filter = "hyphen") {
     const splitString = string.split("-");
     const capitalize2 = (s) => s.charAt(0).toUpperCase() + s.substring(1);
     switch (filter) {
@@ -89,7 +89,7 @@
               (a) => a ? a.trim() : a
             );
             if (param in params) {
-              const value = formatStringWithFilter(
+              const value = transformStringWithFilter(
                 params[param],
                 paramsRaw[param],
                 filter
@@ -262,7 +262,7 @@
       params["component.name"] = safeString(componentNode.name);
     }
     for (let key in css) {
-      const k = formatStringWithFilter(key, key, "camel");
+      const k = transformStringWithFilter(key, key, "camel");
       params[`css.${k}`] = css[key];
       paramsRaw[`css.${k}`] = css[key];
     }
