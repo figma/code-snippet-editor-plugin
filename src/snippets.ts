@@ -25,7 +25,7 @@ const regexQualifierOr = "([^}&]+)";
 const regexQualifierAnd = "([^}|]+)";
 /**
  * Regular expression string for qualifiers, combining three group strings above into one.
- * https://github.com/figma/code-snippet-editor-plugin/tree/main#operators
+ * https://github.com/figma/code-snippet-editor-plugin#operators
  */
 const regexQualifiers = [
   regexQualifierSingle,
@@ -34,7 +34,7 @@ const regexQualifiers = [
 ].join("|");
 /**
  * Regular expression for qualifiers that includes above group parts.
- * https://github.com/figma/code-snippet-editor-plugin/tree/main#qualifiers
+ * https://github.com/figma/code-snippet-editor-plugin#qualifiers
  */
 const regexQualifier = new RegExp(`\{\{([\?\!])(${regexQualifiers})\}\}`, "g");
 
@@ -103,7 +103,7 @@ export async function nodeSnippetTemplateDataArrayFromNode(
 
 /**
  * Transform a string with a filter
- * https://github.com/figma/code-snippet-editor-plugin/tree/main#filters
+ * https://github.com/figma/code-snippet-editor-plugin#filters
  * @param string the string to transform
  * @param rawString the raw form of the string (returned if filter is "raw")
  * @param filter the snippet string filter to apply to the string
@@ -190,7 +190,7 @@ async function hydrateSnippets(
 
     /**
      * Single line syntax collapses "/" prefix and suffix into single line spaces
-     * https://github.com/figma/code-snippet-editor-plugin/tree/main#single-line-syntax
+     * https://github.com/figma/code-snippet-editor-plugin#single-line-syntax
      */
     const codeString = code
       .join("\n")

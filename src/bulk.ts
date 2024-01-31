@@ -3,7 +3,7 @@ import { paramsFromNode } from "./params";
 
 /**
  * Bulk operations when run in design mode.
- * https://github.com/figma/code-snippet-editor-plugin/tree/main?#bulk-operations
+ * https://github.com/figma/code-snippet-editor-plugin?#bulk-operations
  */
 export const bulk = {
   performImport,
@@ -14,7 +14,7 @@ export const bulk = {
 
 /**
  * Import code snippet templates into components in bulk via JSON.
- * https://github.com/figma/code-snippet-editor-plugin/tree/main#importexport
+ * https://github.com/figma/code-snippet-editor-plugin#importexport
  * @param eventData stringified CodegenResultTemplatesByComponentKey
  * @returns void
  */
@@ -36,7 +36,7 @@ function performImport(eventData: string) {
 
 /**
  * Export code snippet templates, posting stringified CodegenResultTemplatesByComponentKey to UI
- * https://github.com/figma/code-snippet-editor-plugin/tree/main#importexport
+ * https://github.com/figma/code-snippet-editor-plugin#importexport
  * @returns void
  */
 function performExport() {
@@ -56,7 +56,7 @@ function performExport() {
 
 /**
  * Export component data, posting stringified ComponentDataByComponentKey to UI
- * https://github.com/figma/code-snippet-editor-plugin/tree/main#component-data
+ * https://github.com/figma/code-snippet-editor-plugin#component-data
  * @returns void
  */
 function performGetComponentData() {
@@ -89,7 +89,7 @@ function performGetComponentData() {
 
 /**
  * Get node params for all nodes in a selection and posting data to UI
- * https://github.com/figma/code-snippet-editor-plugin/tree/main#node-params
+ * https://github.com/figma/code-snippet-editor-plugin#node-params
  * @returns Promise<void>
  */
 async function performGetNodeData() {
