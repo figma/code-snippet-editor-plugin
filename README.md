@@ -32,6 +32,30 @@ Translate component variants, properties, and more into dynamic code snippets fo
 
 This plugin allows you to write and generate code snippets for Figma nodes, which are rendered in the Inspect Panel in [Dev Mode](https://help.figma.com/hc/en-us/articles/15023124644247-Guide-to-Dev-Mode). You can make these code snippets dynamic, by referring to parameters provided by the plugin. Doing this for your component library will bring accurate code snippets to any project that incorporates your design system.
 
+Snippet templates can represent code in any language. A JSX-style template for a main component like this:
+
+```
+<Button 
+  onClick={() => {}}
+  variant="{{property.variant}}"
+  size="{{property.size}}"
+>
+  {{property.label}}
+</Button>
+```
+
+...when filled with a selected component instance's properties, will render an accurate code snippet in Figma like this:
+
+```jsx
+<Button 
+  onClick={() => {}}
+  variant="primary"
+  size="large"
+>
+  Hello World!
+</Button>
+```
+
 Code snippets are saved in [shared plugin data](https://www.figma.com/plugin-docs/api/properties/nodes-setsharedplugindata/) using the keys `node.getSharedPluginData("codesnippets", "snippets")`. A benefit of shared plugin data is that any plugin can make use of or update these snippets.
 
 You can add code snippets using the Snippet Editor, which is accessible from the settings menu of the plugin in Dev Mode's Inspect Panel:
