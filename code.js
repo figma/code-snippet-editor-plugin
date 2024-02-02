@@ -12,15 +12,15 @@
 
   // src/snippets.ts
   var regexSymbols = /\{\{([^\{\?\}\|]+)(\|([^\{\?\}]+))?\}\}/g;
-  var regexQualifierSingle = "([^}&|]+)";
-  var regexQualifierOr = "([^}&]+)";
-  var regexQualifierAnd = "([^}|]+)";
-  var regexQualifiers = [
-    regexQualifierSingle,
-    regexQualifierOr,
-    regexQualifierAnd
+  var regexConditionalSingle = "([^}&|]+)";
+  var regexConditionalOr = "([^}&]+)";
+  var regexConditionalAnd = "([^}|]+)";
+  var regexConditionals = [
+    regexConditionalSingle,
+    regexConditionalOr,
+    regexConditionalAnd
   ].join("|");
-  var regexQualifier = new RegExp(`{{([?!])(${regexQualifiers})}}`, "g");
+  var regexConditional = new RegExp(`{{([?!])(${regexConditionals})}}`, "g");
   async function nodeSnippetTemplateDataArrayFromNode(node, codeSnippetParamsMap) {
     const nodeSnippetTemplateDataArray = [];
     const seenSnippetTemplates = {};
@@ -77,7 +77,7 @@
       const lines = pluginData2.code.split("\n");
       const code = [];
       lines.forEach((line) => {
-        const [matches, qualifies] = lineQualifierMatch(line, params);
+        const [matches, qualifies] = lineConditionalMatch(line, params);
         matches.forEach((match) => {
           line = line.replace(match[0], "");
         });
@@ -125,8 +125,8 @@
       codegenResultArray
     };
   }
-  function lineQualifierMatch(line, params) {
-    const matches = [...line.matchAll(regexQualifier)];
+  function lineConditionalMatch(line, params) {
+    const matches = [...line.matchAll(regexConditional)];
     if (!matches.length) {
       return [[], true];
     }

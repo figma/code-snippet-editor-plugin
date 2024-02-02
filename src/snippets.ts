@@ -2,7 +2,7 @@ import { getPluginData } from "./pluginData";
 
 /**
  * Regular expression for finding symbols, aka {{property.variant}} in a string.
- * Ignores ? and ! which indicate qualifying statements.
+ * Ignores ? and ! which indicate conditional statements.
  * Three groups:
  *  1. the symbol itself
  *  2. whole filter string
@@ -10,33 +10,33 @@ import { getPluginData } from "./pluginData";
  */
 const regexSymbols = /\{\{([^\{\?\}\|]+)(\|([^\{\?\}]+))?\}\}/g;
 /**
- * Regular expression qualifier group string for finding "single" qualifiers aka no "&" or "|"
+ * Regular expression conditional group string for finding "single" conditionals aka no "&" or "|"
  */
-const regexQualifierSingle = "([^}&|]+)";
+const regexConditionalSingle = "([^}&|]+)";
 /**
- * Regular expression qualifier group string for finding "OR" qualifiers aka no "&"
+ * Regular expression conditional group string for finding "OR" conditionals aka no "&"
  * OR is implied because the above "single" will not match.
  */
-const regexQualifierOr = "([^}&]+)";
+const regexConditionalOr = "([^}&]+)";
 /**
- * Regular expression qualifier group string for finding "AND" qualifiers aka no "|"
+ * Regular expression conditional group string for finding "AND" conditionals aka no "|"
  * AND is implied because the above "single" and "or" will not match.
  */
-const regexQualifierAnd = "([^}|]+)";
+const regexConditionalAnd = "([^}|]+)";
 /**
- * Regular expression string for qualifiers, combining three group strings above into one.
+ * Regular expression string for conditionals, combining three group strings above into one.
  * https://github.com/figma/code-snippet-editor-plugin#operators
  */
-const regexQualifiers = [
-  regexQualifierSingle,
-  regexQualifierOr,
-  regexQualifierAnd,
+const regexConditionals = [
+  regexConditionalSingle,
+  regexConditionalOr,
+  regexConditionalAnd,
 ].join("|");
 /**
- * Regular expression for qualifiers that includes above group parts.
- * https://github.com/figma/code-snippet-editor-plugin#qualifiers
+ * Regular expression for conditionals that includes above group parts.
+ * https://github.com/figma/code-snippet-editor-plugin#conditionals
  */
-const regexQualifier = new RegExp(`\{\{([\?\!])(${regexQualifiers})\}\}`, "g");
+const regexConditional = new RegExp(`\{\{([\?\!])(${regexConditionals})\}\}`, "g");
 
 /**
  * Given a node, get all the relevant snippet templates stored in shared plugin data and hydrate them with params.
@@ -155,7 +155,7 @@ async function hydrateSnippets(
     const lines = pluginData.code.split("\n");
     const code: string[] = [];
     lines.forEach((line) => {
-      const [matches, qualifies] = lineQualifierMatch(line, params);
+      const [matches, qualifies] = lineConditionalMatch(line, params);
       matches.forEach((match) => {
         line = line.replace(match[0], "");
       });
@@ -218,28 +218,28 @@ async function hydrateSnippets(
 }
 
 /**
- * Handling any qualifying statements and  on a line of a template and determining whether or not to render.
- * No qualifying statements is valid, and the line should render.
- * This only checks for qualifying statements, symbols can still invalidate the line if the params dont exist.
+ * Handling any conditional statements and  on a line of a template and determining whether or not to render.
+ * No conditional statements is valid, and the line should render.
+ * This only checks for conditional statements, symbols can still invalidate the line if the params dont exist.
  * @param line the line of snippet template to validate
- * @param params the params to use to validate or invalidate the line based on a qualifying statement.
+ * @param params the params to use to validate or invalidate the line based on a conditional statement.
  * @returns array of the line's qualifing statements as RegExpMatchArray, and whether or not the line can render.
  */
-function lineQualifierMatch(
+function lineConditionalMatch(
   line: string,
   params: CodeSnippetParams
 ): [RegExpMatchArray[], boolean] {
   /**
-   * Line qualifier statement matches.
+   * Line conditional statement matches.
    * {{?something=value}}
    * {{!something=value}}
    * {{?something}}
    * {{?something=value|something=other}}
    * {{?something=value&other=value}}
    */
-  const matches = [...line.matchAll(regexQualifier)];
+  const matches = [...line.matchAll(regexConditional)];
 
-  // No qualifier statement on the line. This is valid.
+  // No conditional statement on the line. This is valid.
   if (!matches.length) {
     return [[], true];
   }

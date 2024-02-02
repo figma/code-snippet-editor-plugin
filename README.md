@@ -7,7 +7,7 @@ Translate component variants, properties, and more into dynamic code snippets fo
 - [Overview](#overview)
 - [Templating](#templating)
   - [Symbols](#symbols)
-  - [Qualifiers](#qualifiers)
+  - [Conditionals](#conditionals)
   - [Operators](#operators)
   - [Samples](#samples)
   - [Single Line Syntax](#single-line-syntax)
@@ -68,7 +68,7 @@ Snippets can either be static or utilize the snippet templating language, which 
 
 ## Templating
 
-Each line of a code snippet is individually evaluated. Lines of a snippet can include dynamic symbols or qualifiers that refer to parameters from the selected node in Figma. Template parameters are all treated like strings. There is no concept of primitives (number, boolean, etc) in this templating language.
+Each line of a code snippet is individually evaluated. Lines of a snippet can include dynamic symbols or conditional statements that refer to parameters from the selected node in Figma. Template parameters are all treated like strings. There is no concept of primitives (number, boolean, etc) in this templating language.
 
 ### Symbols
 
@@ -82,11 +82,11 @@ If `something` was defined as `"world"`, this would render `"Hello world!"`.
 
 For a line to render, the appropriate data must be present. If `something` was not defined at all, the line would not render.
 
-### Qualifiers
+### Conditionals
 
-Each line can start with a qualifying statement. Qualifiers do not render anything by themselves, they are logical ammendments to the line.
+Each line can start with a conditional statement. Conditionals do not render anything by themselves, they are logical ammendments to the line.
 
-Qualifiers can be either affirmative with a question mark `{{?something=yes}}`, or negative with an exclamation mark `{{!something=yes}}`. For a line to render, these statements must be validated.
+Conditionals can be either affirmative with a question mark `{{?something=yes}}`, or negative with an exclamation mark `{{!something=yes}}`. For a line to render, these statements must be validated.
 
 You can also detect the presence of a property by omitting the equals sign and value. For example, `{{?something}}` and `{{!something}}` would be the affirmative and negative statement for the presence and absence of `something`.
 
@@ -99,7 +99,7 @@ You can also detect the presence of a property by omitting the equals sign and v
 
 ### Operators
 
-While you can add multiple qualifiers to a single line, using an operator is often a better way to express logic. You can make "or" statements with `|`, as well as "and" statements with `&`.
+While you can add multiple conditional statements to a single line, using an operator is often a better way to express logic. You can make "or" statements with `|`, as well as "and" statements with `&`.
 
 For example, `{{?A=1}}{{?B=2}}` can also be expressed as `{{?A=1&B=2}}`.
 
@@ -111,7 +111,7 @@ For example, `{{?A=1}}{{?B=2}}` can also be expressed as `{{?A=1&B=2}}`.
 {{?A=1|B=2|C=3}}A is "1" OR B is "2" OR C is "3"
 ```
 
-You cannot combine "or" and "and" statements (eg. `A=1|B=2&C=3`). You can express them as separate qualifying statements (eg.`{{?A=1|B=2}}{{?C=3}}`).
+You cannot combine "or" and "and" statements (eg. `A=1|B=2&C=3`). You can express them as separate conditional statements (eg.`{{?A=1|B=2}}{{?C=3}}`).
 
 ### Samples
 
@@ -187,7 +187,7 @@ This would yield `"hello world"` due to the extra trailing slash on line one and
 
 ## Params
 
-The values you can refer to in symbols and qualifiers are called "params". These parameters are formatted as `prefix.param`.
+The values you can refer to in symbols and conditional statements are called "params". These parameters are formatted as `prefix.param`.
 
 > Enable ["Details mode"](#details-mode) to see all the params available for your selection!
 
