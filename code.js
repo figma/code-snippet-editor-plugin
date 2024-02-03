@@ -11,7 +11,8 @@
   }
 
   // src/snippets.ts
-  var regexSymbols = /\{\{([^\{\?\}\|]+)(\|([^\{\?\}]+))?\}\}/g;
+  var regexSymbols = /(?!\\)\{\{([^\{\?\}\|]+)(\|([^\{\?\}]+))?\}\}/g;
+  var unescapeBrackets = (line) => line.replace(/\\\{\{/g, "{{");
   var regexConditionalSingle = "([^}&|]+)";
   var regexConditionalOr = "([^}&]+)";
   var regexConditionalAnd = "([^}|]+)";
@@ -102,9 +103,11 @@
             }
           });
           if (succeeded) {
+            line = unescapeBrackets(line);
             code.push(line);
           }
         } else if (qualifies) {
+          line = unescapeBrackets(line);
           code.push(line);
         }
       });

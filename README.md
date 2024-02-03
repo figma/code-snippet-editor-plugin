@@ -7,6 +7,7 @@ Translate component variants, properties, and more into dynamic code snippets fo
 - [Overview](#overview)
 - [Templating](#templating)
   - [Symbols](#symbols)
+  - [Escaping](#escaping)
   - [Conditionals](#conditionals)
   - [Operators](#operators)
   - [Samples](#samples)
@@ -81,6 +82,12 @@ Hello {{something}}!
 If `something` was defined as `"world"`, this would render `"Hello world!"`.
 
 For a line to render, the appropriate data must be present. If `something` was not defined at all, the line would not render.
+
+### Escaping
+
+If you need to write the text `"{{something}}"` explicitly in your rendered code, you can escape that text with a single backslash prefix like `"\{{something}}"`.
+
+A more realistic example is the Ember language which requires something like `<Button @label={{t "Value"}} />`. To achieve this, the template would escape the outer brackets with a single prefix. `<Button @label=\{{t "{{something}}"}} />`.
 
 ### Conditionals
 
