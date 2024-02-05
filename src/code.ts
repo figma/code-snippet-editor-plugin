@@ -1,5 +1,8 @@
 import { bulk } from "./bulk";
-import { getPluginData, setPluginData } from "./pluginData";
+import {
+  getCodegenResultsFromPluginData,
+  setCodegenResultsInPluginData,
+} from "./pluginData";
 import { paramsFromNode } from "./params";
 import { nodeSnippetTemplateDataArrayFromNode } from "./snippets";
 
@@ -30,11 +33,11 @@ function initializeCodegenMode() {
    *  - INITIALIZE: requesting initial data about the current selection when it opens
    *  - SAVE: providing template data for the plugin to save on the current selection
    */
-  figma.ui.on("message", async (event) => {
+  figma.ui.on("message", async (event: EventFromEditor) => {
     if (event.type === "INITIALIZE") {
       handleCurrentSelection();
     } else if (event.type === "SAVE") {
-      setPluginData(figma.currentPage.selection[0], event.data);
+      setCodegenResultsInPluginData(figma.currentPage.selection[0], event.data);
     } else {
       console.log("UNKNOWN EVENT", event);
     }
@@ -113,7 +116,7 @@ function initializeCodegenMode() {
  *   and helpers for loading node data and component data.
  */
 function initializeDesignMode() {
-  figma.ui.on("message", async (event) => {
+  figma.ui.on("message", async (event: EventFromBulk) => {
     if (event.type === "INITIALIZE") {
       handleCurrentSelection();
     } else if (event.type === "COMPONENT_DATA") {
@@ -195,15 +198,16 @@ function codegenResultsFromNodeSnippetTemplateDataArray(
 function handleCurrentSelection() {
   const node = figma.currentPage.selection[0];
   try {
-    const nodePluginData = node ? getPluginData(node) : null;
+    const nodePluginData = node ? getCodegenResultsFromPluginData(node) : null;
     const nodeId = node ? node.id : null;
     const nodeType = node ? node.type : null;
-    figma.ui.postMessage({
+    const message: EventToEditor = {
       type: "SELECTION",
       nodeId,
       nodeType,
       nodePluginData,
-    });
+    };
+    figma.ui.postMessage(message);
     return node;
   } catch (e) {
     // no ui open. ignore this.

@@ -1,4 +1,7 @@
-import { getPluginData, setPluginData } from "./pluginData";
+import {
+  getCodegenResultsFromPluginData,
+  setCodegenResultsInPluginData,
+} from "./pluginData";
 import { paramsFromNode } from "./params";
 
 /**
@@ -15,19 +18,17 @@ export const bulk = {
 /**
  * Import code snippet templates into components in bulk via JSON.
  * https://github.com/figma/code-snippet-editor-plugin#importexport
- * @param eventData stringified CodegenResultTemplatesByComponentKey
+ * @param data CodegenResultTemplatesByComponentKey
  * @returns void
  */
-function performImport(eventData: string) {
+function performImport(data: CodegenResultTemplatesByComponentKey) {
   const componentsByKey = getComponentsInFileByKey();
-  const data: CodegenResultTemplatesByComponentKey = JSON.parse(eventData);
   let componentCount = 0;
   for (let componentKey in data) {
-    const dataToSave = JSON.stringify(data[componentKey]);
     const component = componentsByKey[componentKey];
     if (component) {
       componentCount++;
-      setPluginData(component, dataToSave);
+      setCodegenResultsInPluginData(component, data[componentKey]);
     }
   }
   const s = componentCount === 1 ? "" : "s";
@@ -43,15 +44,16 @@ function performExport() {
   const data: CodegenResultTemplatesByComponentKey = {};
   const components = findComponentNodesInFile();
   components.forEach((component) => {
-    const pluginData = getPluginData(component);
-    if (pluginData) {
-      data[component.key] = JSON.parse(pluginData) as CodegenResult[];
+    const codegenResults = getCodegenResultsFromPluginData(component);
+    if (codegenResults) {
+      data[component.key] = codegenResults;
     }
   });
-  figma.ui.postMessage({
+  const message: EventToBulk = {
     type: "EXPORT",
     code: JSON.stringify(data, null, 2),
-  });
+  };
+  figma.ui.postMessage(message);
 }
 
 /**
@@ -81,10 +83,11 @@ function performGetComponentData() {
     }
     return into;
   }, componentData);
-  figma.ui.postMessage({
+  const message: EventToBulk = {
     type: "COMPONENT_DATA",
     code: JSON.stringify(data, null, 2),
-  });
+  };
+  figma.ui.postMessage(message);
 }
 
 /**
@@ -101,10 +104,11 @@ async function performGetNodeData() {
       return;
     })
   );
-  figma.ui.postMessage({
+  const message: EventToBulk = {
     type: "NODE_DATA",
     code: JSON.stringify(data, null, 2),
-  });
+  };
+  figma.ui.postMessage(message);
 }
 
 /**

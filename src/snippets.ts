@@ -1,4 +1,4 @@
-import { getPluginData } from "./pluginData";
+import { getCodegenResultsFromPluginData } from "./pluginData";
 
 /**
  * Regular expression for finding symbols, aka {{property.variant}} in a string.
@@ -16,7 +16,7 @@ const regexSymbols = /(?!\\)\{\{([^\{\?\}\|]+)(\|([^\{\?\}]+))?\}\}/g;
  * Brackets only need to be escaped when used in a way that matches "{{...}}"
  * "\{{hi}}" becomes "{{hi}}"
  */
-const unescapeBrackets = (line: string) => line.replace(/\\\{\{/g, "{{")
+const unescapeBrackets = (line: string) => line.replace(/\\\{\{/g, "{{");
 /**
  * Regular expression conditional group string for finding "single" conditionals aka no "&" or "|"
  */
@@ -44,7 +44,10 @@ const regexConditionals = [
  * Regular expression for conditionals that includes above group parts.
  * https://github.com/figma/code-snippet-editor-plugin#conditionals
  */
-const regexConditional = new RegExp(`\{\{([\?\!])(${regexConditionals})\}\}`, "g");
+const regexConditional = new RegExp(
+  `\{\{([\?\!])(${regexConditionals})\}\}`,
+  "g"
+);
 
 /**
  * Given a node, get all the relevant snippet templates stored in shared plugin data and hydrate them with params.
@@ -55,7 +58,8 @@ const regexConditional = new RegExp(`\{\{([\?\!])(${regexConditionals})\}\}`, "g
  */
 export async function nodeSnippetTemplateDataArrayFromNode(
   node: SceneNode,
-  codeSnippetParamsMap: CodeSnippetParamsMap
+  codeSnippetParamsMap: CodeSnippetParamsMap,
+  globalTemplates?: CodeSnippetGlobalTemplates
 ): Promise<NodeSnippetTemplateData[]> {
   const nodeSnippetTemplateDataArray: NodeSnippetTemplateData[] = [];
   const seenSnippetTemplates: { [k: string]: number } = {};
@@ -68,16 +72,28 @@ export async function nodeSnippetTemplateDataArrayFromNode(
    * @returns Promise<void> will push into nodeSnippetTemplateDataArray.
    */
   async function processSnippetTemplatesForNode(node: SceneNode) {
-    const pluginData = getPluginData(node);
-    if (pluginData && !seenSnippetTemplates[pluginData]) {
-      seenSnippetTemplates[pluginData] = 1;
-      const nodeSnippetTemplateData = await hydrateSnippets(
-        pluginData,
-        codeSnippetParamsMap,
-        node.type
-      );
-      nodeSnippetTemplateDataArray.push(nodeSnippetTemplateData);
+    const codegenResults = getCodegenResultsFromPluginData(node);
+    const codegenResultTemplates: CodegenResult[] = [];
+    if (codegenResults.length) {
+      const seenKey = JSON.stringify(codegenResults);
+      if (!seenSnippetTemplates[seenKey]) {
+        seenSnippetTemplates[seenKey] = 1;
+        codegenResultTemplates.push(...codegenResults);
+      }
     }
+    if (globalTemplates) {
+      const componentTemplates =
+        "key" in node ? globalTemplates.components[node.key] || [] : [];
+      const typeTemplates = globalTemplates.types[node.type] || [];
+      codegenResultTemplates.push(...componentTemplates);
+      codegenResultTemplates.push(...typeTemplates);
+    }
+    const nodeSnippetTemplateData = await hydrateSnippets(
+      codegenResultTemplates,
+      codeSnippetParamsMap,
+      node.type
+    );
+    nodeSnippetTemplateDataArray.push(nodeSnippetTemplateData);
   }
 
   /**
@@ -90,12 +106,16 @@ export async function nodeSnippetTemplateDataArrayFromNode(
    */
   if (node.type === "INSTANCE") {
     if (node.mainComponent) {
+      console.log("0", nodeSnippetTemplateDataArray);
       await processSnippetTemplatesForNode(node.mainComponent);
+      console.log("1", nodeSnippetTemplateDataArray);
       if (
         node.mainComponent.parent &&
         node.mainComponent.parent.type === "COMPONENT_SET"
       ) {
+        console.log("2", nodeSnippetTemplateDataArray);
         await processSnippetTemplatesForNode(node.mainComponent.parent);
+        console.log("3", nodeSnippetTemplateDataArray);
       }
     }
   } else if (
@@ -145,22 +165,21 @@ export function transformStringWithFilter(
 
 /**
  * Fill templates with code snippet params.
- * @param pluginData string form of the snippet templates loaded from pluginData.
+ * @param codegenResultTemplatesArray codegen result array of templates loaded from pluginData or global templates.
  * @param codeSnippetParamsMap the map of raw and sanitized params used to hydrate the template.
  * @returns a Promise resolving NodeSnippetTemplateData
  */
 async function hydrateSnippets(
-  pluginData: string,
+  codegenResultTemplatesArray: CodegenResult[],
   codeSnippetParamsMap: CodeSnippetParamsMap,
   nodeType: string
 ): Promise<NodeSnippetTemplateData> {
   const { paramsRaw, params } = codeSnippetParamsMap;
-  const pluginDataArray = JSON.parse(pluginData) as CodegenResult[];
   const codegenResultArray: CodegenResult[] = [];
   const codegenResultRawTemplatesArray: CodegenResult[] = [];
 
-  pluginDataArray.forEach((pluginData) => {
-    const lines = pluginData.code.split("\n");
+  codegenResultTemplatesArray.forEach((codegenResult) => {
+    const lines = codegenResult.code.split("\n");
     const code: string[] = [];
     lines.forEach((line) => {
       const [matches, qualifies] = lineConditionalMatch(line, params);
@@ -193,7 +212,7 @@ async function hydrateSnippets(
           code.push(line);
         }
       } else if (qualifies) {
-        line = unescapeBrackets(line)
+        line = unescapeBrackets(line);
         code.push(line);
       }
     });
@@ -209,15 +228,15 @@ async function hydrateSnippets(
       .replace(/\\\n/g, " "); // collapse single line
 
     codegenResultArray.push({
-      title: pluginData.title,
-      language: pluginData.language,
+      title: codegenResult.title,
+      language: codegenResult.language,
       code: codeString,
     });
 
     codegenResultRawTemplatesArray.push({
-      title: `${pluginData.title}: Template (${nodeType})`,
+      title: `${codegenResult.title}: Template (${nodeType})`,
       language: "PLAINTEXT",
-      code: pluginData.code,
+      code: codegenResult.code,
     });
   });
 
