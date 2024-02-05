@@ -1,4 +1,14 @@
 /**
+ * An object containing global template definitions.
+ *  "components" is a map binding component keys to codegen result arrays.
+ *  "types" is a map binding  NodeTypes to codegen result arrays.
+ */
+type CodeSnippetGlobalTemplates = {
+  components: CodegenResultTemplatesByComponentKey;
+  types: { [K in NodeType]?: CodegenResult[] };
+};
+
+/**
  * An object of params to fill a snippet template where k is like "property.variant"
  */
 type CodeSnippetParams = { [k: string]: string };
@@ -55,7 +65,7 @@ interface NodeSnippetTemplateData {
  * Where key is the component key and value is an array of codegenResultTemplates
  */
 type CodegenResultTemplatesByComponentKey = {
-  [k: string]: CodegenResult[];
+  [componentKey: string]: CodegenResult[];
 };
 
 /**
@@ -63,12 +73,60 @@ type CodegenResultTemplatesByComponentKey = {
  * Where key is the component key and value is an array of codegenResultTemplates
  */
 type ComponentDataByComponentKey = {
-  [k: string]: { name: string; description: string; lineage: string };
+  [componentKey: string]: {
+    name: string;
+    description: string;
+    lineage: string;
+  };
 };
 
 /**
  * Object of components and component sets by key
  */
 type ComponentsByComponentKey = {
-  [k: string]: ComponentNode | ComponentSetNode;
+  [componentKey: string]: ComponentNode | ComponentSetNode;
+};
+
+/**
+ * Events coming in from the editor.html ui
+ */
+type EventFromEditor =
+  | {
+      type: "INITIALIZE";
+    }
+  | EventFromEditorSave;
+type EventFromEditorSave = {
+  type: "SAVE";
+  data: CodegenResult[];
+};
+/**
+ * Events sending to the editor.html ui
+ */
+type EventToEditor = {
+  type: "SELECTION";
+  nodeId: string | null;
+  nodeType: SceneNode["type"] | null;
+  nodePluginData: CodegenResult[] | null;
+};
+
+/**
+ * Events coming in from the bulk.html ui
+ */
+type EventFromBulk =
+  | {
+      type: "INITIALIZE" | "COMPONENT_DATA" | "NODE_DATA" | "EXPORT";
+    }
+  | EventFromBulkImport;
+
+type EventFromBulkImport = {
+  type: "IMPORT";
+  data: CodegenResultTemplatesByComponentKey;
+};
+
+/**
+ * Events sending to the bulk.html ui
+ */
+type EventToBulk = {
+  type: "COMPONENT_DATA" | "NODE_DATA" | "EXPORT";
+  code: string;
 };

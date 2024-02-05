@@ -105,7 +105,8 @@
       });
       document.getElementById("import").addEventListener("click", () => {
         try {
-          const array = Object.keys(JSON.parse(textarea.value));
+          const data = JSON.parse(textarea.value);
+          const array = Object.keys(data);
           const s = array.length === 1 ? "" : "s";
           if (
             window.confirm(
@@ -113,7 +114,7 @@
             )
           ) {
             parent.postMessage(
-              { pluginMessage: { type: "IMPORT", data: textarea.value } },
+              { pluginMessage: { type: "IMPORT", data } },
               "*"
             );
           }

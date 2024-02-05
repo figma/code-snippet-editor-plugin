@@ -253,9 +253,7 @@
       function handleSelectionChange({ nodeId, nodePluginData, nodeType }) {
         currentNodeType = nodeType;
         if (nodeId) {
-          snippetList = nodePluginData
-            ? JSON.parse(nodePluginData).map(itemFromData)
-            : [];
+          snippetList = nodePluginData ? nodePluginData.map(itemFromData) : [];
           render();
         } else {
           console.log("No nodes selected. Shouldn't happen in settings mode.");
@@ -290,10 +288,7 @@
             code: textarea.value,
             title: input.value,
           }));
-        parent.postMessage(
-          { pluginMessage: { type: "SAVE", data: JSON.stringify(data) } },
-          "*"
-        );
+        parent.postMessage({ pluginMessage: { type: "SAVE", data } }, "*");
       }
 
       function itemFromData(
