@@ -625,7 +625,11 @@
         return snippets;
       } catch (e) {
         return [
-          { language: "JSON", code: JSON.stringify(e, null, 2), title: "Error" }
+          {
+            language: "PLAINTEXT",
+            code: typeof e === "string" ? e : `${e}`,
+            title: "Error"
+          }
         ];
       }
     });
