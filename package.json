@@ -5,8 +5,9 @@
   "main": "code.js",
   "scripts": {
     "test": "node test.js",
-    "build": "esbuild src/code.ts --bundle --outfile=code.js && esbuild src/test.ts --bundle --outfile=test.js",
-    "dev": "npm run build -- --watch"
+    "build:src": "esbuild src/code.ts --bundle --outfile=code.js",
+    "build:test": "esbuild src/test.ts --bundle --outfile=test.js",
+    "dev": "concurrently -n source,test \"npm run build:src -- --watch\" \"npm run build:test -- --watch\""
   },
   "repository": {
     "type": "git",
@@ -20,6 +21,7 @@
   "homepage": "https://github.com/figma/code-snippet-editor-plugin#readme",
   "devDependencies": {
     "@figma/plugin-typings": "^1.85.0",
+    "concurrently": "^8.2.2",
     "esbuild": "^0.19.12",
     "typescript": "^5.3.3"
   }
