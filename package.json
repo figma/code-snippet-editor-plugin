@@ -4,8 +4,8 @@
   "description": "Translate component variants, properties, and more into dynamic code snippets for your design system.",
   "main": "code.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "esbuild src/code.ts --bundle --outfile=code.js",
+    "test": "node test.js",
+    "build": "esbuild src/code.ts --bundle --outfile=code.js && esbuild src/test.ts --bundle --outfile=test.js",
     "dev": "npm run build -- --watch"
   },
   "repository": {
