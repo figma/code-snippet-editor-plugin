@@ -75,7 +75,7 @@
   }
 
   // src/snippets.ts
-  var regexSymbols = /(?!\\)\{\{([^\{\?\}\|]+)(\|([^\{\?\}]+))?\}\}/g;
+  var regexSymbols = /(?<!\\)\{\{([^\{\?\}\|]+)(\|([^\{\?\}]+))?\}\}/g;
   var unescapeBrackets = (line) => line.replace(/\\\{\{/g, "{{");
   var regexConditionalSingle = "([^}&|]+)";
   var regexConditionalOr = "([^}&]+)";

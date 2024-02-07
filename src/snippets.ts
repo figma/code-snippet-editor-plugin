@@ -4,13 +4,14 @@ import { getCodegenResultsFromPluginData } from "./pluginData";
  * Regular expression for finding symbols, aka {{property.variant}} in a string.
  * Ignores ? and ! which indicate conditional statements.
  * Escape double curly brackets with a single backslash, eg. "\{{hi}}" would be entirely escaped
- * Negative lookahead at beginning of expression "(?!\\\)" respects escaping.
+ * Negative lookbehind at beginning of expression "(?<!\\\)" respects escaping.
  * Three groups:
  *  1. the symbol itself
  *  2. whole filter string
  *  3. subset of filter string that represents the filter value
  */
-const regexSymbols = /(?!\\)\{\{([^\{\?\}\|]+)(\|([^\{\?\}]+))?\}\}/g;
+const regexSymbols = /(?<!\\)\{\{([^\{\?\}\|]+)(\|([^\{\?\}]+))?\}\}/g;
+
 /**
  * Replacing escaped brackets with standard brackets.
  * Brackets only need to be escaped when used in a way that matches "{{...}}"
@@ -165,7 +166,7 @@ export function transformStringWithFilter(
  * @param codeSnippetParamsMap the map of raw and sanitized params used to hydrate the template.
  * @returns a Promise resolving NodeSnippetTemplateData
  */
-async function hydrateSnippets(
+export async function hydrateSnippets(
   codegenResultTemplatesArray: CodegenResult[],
   codeSnippetParamsMap: CodeSnippetParamsMap,
   nodeType: string
