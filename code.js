@@ -76,10 +76,6 @@
 
   // src/snippets.ts
   var regexSymbols = /(?<!\\)\{\{([^\{\?\}\|]+)(\|([^\{\?\}]+))?\}\}/g;
-  console.log(
-    `{{as1df}}
-{{as2df}}`.split("\n").map((line) => line.match(regexSymbols))
-  );
   var unescapeBrackets = (line) => line.replace(/\\\{\{/g, "{{");
   var regexConditionalSingle = "([^}&|]+)";
   var regexConditionalOr = "([^}&]+)";
