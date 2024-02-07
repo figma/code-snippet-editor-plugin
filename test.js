@@ -97,6 +97,22 @@
       paramsRaw["node.children"] = childCount;
       params["node.children"] = childCount;
     }
+    if (node.type === "TEXT") {
+      paramsRaw["node.characters"] = node.characters;
+      params["node.characters"] = safeString(node.characters);
+      if (node.textStyleId) {
+        if (node.textStyleId === figma.mixed) {
+          paramsRaw["node.textStyle"] = "figma.mixed";
+          params["node.textStyle"] = "figma.mixed";
+        } else {
+          const style = figma.getStyleById(node.textStyleId);
+          if (style) {
+            paramsRaw["node.textStyle"] = style.name;
+            params["node.textStyle"] = safeString(style.name);
+          }
+        }
+      }
+    }
     if (componentNode && "key" in componentNode) {
       paramsRaw["component.key"] = componentNode.key;
       paramsRaw["component.type"] = componentNode.type;

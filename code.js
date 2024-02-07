@@ -95,7 +95,7 @@
     const seenSnippetTemplates = {};
     async function processSnippetTemplatesForNode(snippetNode) {
       const codegenResults = getCodegenResultsFromPluginData(snippetNode);
-      const matchingTemplates = (templates) => templates.filter(
+      const matchingTemplates = (templates2) => templates2.filter(
         ({ title, language }) => !parentCodegenResult || title === parentCodegenResult.title && language === parentCodegenResult.language
       );
       const matchingCodegenResults = matchingTemplates(codegenResults);
@@ -400,6 +400,22 @@ ${indent}`);
       paramsRaw["node.children"] = childCount;
       params["node.children"] = childCount;
     }
+    if (node.type === "TEXT") {
+      paramsRaw["node.characters"] = node.characters;
+      params["node.characters"] = safeString(node.characters);
+      if (node.textStyleId) {
+        if (node.textStyleId === figma.mixed) {
+          paramsRaw["node.textStyle"] = "figma.mixed";
+          params["node.textStyle"] = "figma.mixed";
+        } else {
+          const style = figma.getStyleById(node.textStyleId);
+          if (style) {
+            paramsRaw["node.textStyle"] = style.name;
+            params["node.textStyle"] = safeString(style.name);
+          }
+        }
+      }
+    }
     if (componentNode && "key" in componentNode) {
       paramsRaw["component.key"] = componentNode.key;
       paramsRaw["component.type"] = componentNode.type;
@@ -627,6 +643,50 @@ ${indent}`);
     return data;
   }
 
+  // src/templates.ts
+  var templates = {
+    components: {},
+    types: {
+      FRAME: [
+        {
+          title: "React",
+          language: "JAVASCRIPT",
+          code: `<Grid 
+  direction="{{autolayout.layoutMode}}"
+  padding={{ 
+    {{?variables.paddingTop}}top: theme.{{variables.paddingTop|camel}},
+    {{!variables.paddingTop}}top: {{autolayout.paddingTop}},
+    {{?variables.paddingRight}}right: theme.{{variables.paddingRight|camel}},
+    {{!variables.paddingRight}}right: {{autolayout.paddingRight}},
+    {{?variables.paddingBottom}}bottom: theme.{{variables.paddingBottom|camel}},
+    {{!variables.paddingBottom}}bottom: {{autolayout.paddingBottom}},
+    {{?variables.paddingLeft}}left: theme.{{variables.paddingLeft|camel}},
+    {{!variables.paddingLeft}}left: {{autolayout.paddingLeft}},
+  }}
+  {{?variables.itemSpacing}}gap={theme.{{variables.itemSpacing|camel}}}
+  {{!variables.itemSpacing}}gap={{{autolayout.itemSpacing}}}
+  {{?autolayout.layoutMode=horizontal}}verticalAlign="{{autolayout.counterAxisAlignItems}}"
+  {{!autolayout.layoutMode=horizontal}}verticalAlign="{{autolayout.primaryAxisAlignItems}}"
+  {{?autolayout.layoutMode=horizontal}}horizontalAlign="{{autolayout.primaryAxisAlignItems}}"
+  {{!autolayout.layoutMode=horizontal}}horizontalAlign="{{autolayout.counterAxisAlignItems}}"
+>
+  {{figma.children}}
+</Grid>`
+        }
+      ],
+      TEXT: [
+        {
+          title: "React",
+          language: "JAVASCRIPT",
+          code: `<Typography\\
+variant="{{node.textStyle}}"\\
+{{!node.textStyle}}variant="unknown"\\
+\\>{{node.characters|raw}}</Typography>`
+        }
+      ]
+    }
+  };
+
   // src/code.ts
   if (figma.mode === "codegen") {
     initializeCodegenMode();
@@ -656,7 +716,11 @@ ${indent}`);
         const hasDefaultMessage = defaultSnippet === "message";
         const currentNode = handleCurrentSelection();
         const paramsMap = await paramsFromNode(currentNode);
-        const nodeSnippetTemplateDataArray = await nodeSnippetTemplateDataArrayFromNode(currentNode, paramsMap, {});
+        const nodeSnippetTemplateDataArray = await nodeSnippetTemplateDataArrayFromNode(
+          currentNode,
+          paramsMap,
+          templates
+        );
         const snippets = codegenResultsFromNodeSnippetTemplateDataArray(
           nodeSnippetTemplateDataArray,
           isDetailsMode

@@ -5,6 +5,7 @@ import {
 } from "./pluginData";
 import { paramsFromNode } from "./params";
 import { nodeSnippetTemplateDataArrayFromNode } from "./snippets";
+import { templates } from "./templates";
 
 if (figma.mode === "codegen") {
   initializeCodegenMode();
@@ -66,7 +67,11 @@ function initializeCodegenMode() {
 
       const paramsMap = await paramsFromNode(currentNode);
       const nodeSnippetTemplateDataArray =
-        await nodeSnippetTemplateDataArrayFromNode(currentNode, paramsMap, {});
+        await nodeSnippetTemplateDataArrayFromNode(
+          currentNode,
+          paramsMap,
+          templates
+        );
 
       const snippets = codegenResultsFromNodeSnippetTemplateDataArray(
         nodeSnippetTemplateDataArray,
