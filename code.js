@@ -118,13 +118,9 @@
     await processSnippetTemplatesForNode(node);
     if (node.type === "INSTANCE") {
       if (node.mainComponent) {
-        console.log("0", nodeSnippetTemplateDataArray);
         await processSnippetTemplatesForNode(node.mainComponent);
-        console.log("1", nodeSnippetTemplateDataArray);
         if (node.mainComponent.parent && node.mainComponent.parent.type === "COMPONENT_SET") {
-          console.log("2", nodeSnippetTemplateDataArray);
           await processSnippetTemplatesForNode(node.mainComponent.parent);
-          console.log("3", nodeSnippetTemplateDataArray);
         }
       }
     } else if (node.type === "COMPONENT" && node.parent && node.parent.type === "COMPONENT_SET") {
