@@ -435,6 +435,10 @@ See [./examples.json](./examples.json) for real world examples.
 
 Syncing this JSON exernally is on the roadmap, but for now, the only way to add global templates is to select "Open Global Template Editor" from the plugin settings menu, paste the JSON into the text box, and hit save.
 
+![Selecting "Open Global Template Editor" from the plugin settings menu](https://github.com/figma/code-snippet-editor-plugin/assets/97200987/70c56ee9-1b02-4a45-9ce5-55301a6578c3)
+
+![Global Template Editor UI](https://github.com/figma/code-snippet-editor-plugin/assets/97200987/09d04b40-59f7-43c4-b878-40b319e98c23)
+
 ## “Details Mode”
 
 Details mode can be enabled from the plugin settings menu.
