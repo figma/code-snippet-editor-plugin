@@ -97,6 +97,22 @@
       paramsRaw["node.children"] = childCount;
       params["node.children"] = childCount;
     }
+    if (node.type === "TEXT") {
+      paramsRaw["node.characters"] = node.characters;
+      params["node.characters"] = safeString(node.characters);
+      if (node.textStyleId) {
+        if (node.textStyleId === figma.mixed) {
+          paramsRaw["node.textStyle"] = "figma.mixed";
+          params["node.textStyle"] = "figma.mixed";
+        } else {
+          const style = figma.getStyleById(node.textStyleId);
+          if (style) {
+            paramsRaw["node.textStyle"] = style.name;
+            params["node.textStyle"] = safeString(style.name);
+          }
+        }
+      }
+    }
     if (componentNode && "key" in componentNode) {
       paramsRaw["component.key"] = componentNode.key;
       paramsRaw["component.type"] = componentNode.type;
@@ -459,7 +475,7 @@ ${indent}`);
   }
   async function findChildrenSnippets(codegenResult, nodeChildren, indent, recursionIndex, globalTemplates) {
     const string = [];
-    const childPromises = nodeChildren.map(async (child) => {
+    const childPromises = nodeChildren.map(async (child, index) => {
       const paramsMap = await paramsFromNode(child);
       const snippets = await nodeSnippetTemplateDataArrayFromNode(
         child,
@@ -475,12 +491,12 @@ ${indent}`);
         )
       ).find(Boolean);
       if (snippet) {
-        string.push(snippet.code);
+        string[index] = snippet.code;
       }
       return;
     });
     await Promise.all(childPromises);
-    return string.join("\n");
+    return string.filter(Boolean).join("\n");
   }
   function lineConditionalMatch(line, params) {
     const matches = [...line.matchAll(regexConditional)];

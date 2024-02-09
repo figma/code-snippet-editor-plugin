@@ -240,10 +240,10 @@
       let snippetList = [];
       let currentNodeType;
 
-      parent.postMessage({ pluginMessage: { type: "INITIALIZE" } }, "*");
+      parent.postMessage({ pluginMessage: { type: "EDITOR_INITIALIZE" } }, "*");
       window.onmessage = (e) => {
         const data = e.data.pluginMessage;
-        if (data.type === "SELECTION") {
+        if (data.type === "EDITOR_SELECTION") {
           handleSelectionChange(data);
         } else {
           console.log(data);
@@ -288,7 +288,10 @@
             code: textarea.value,
             title: input.value,
           }));
-        parent.postMessage({ pluginMessage: { type: "SAVE", data } }, "*");
+        parent.postMessage(
+          { pluginMessage: { type: "EDITOR_SAVE", data } },
+          "*"
+        );
       }
 
       function itemFromData(

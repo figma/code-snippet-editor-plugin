@@ -239,7 +239,7 @@ ${indent}`);
   }
   async function findChildrenSnippets(codegenResult, nodeChildren, indent, recursionIndex, globalTemplates) {
     const string = [];
-    const childPromises = nodeChildren.map(async (child) => {
+    const childPromises = nodeChildren.map(async (child, index) => {
       const paramsMap = await paramsFromNode(child);
       const snippets = await nodeSnippetTemplateDataArrayFromNode(
         child,
@@ -255,12 +255,12 @@ ${indent}`);
         )
       ).find(Boolean);
       if (snippet) {
-        string.push(snippet.code);
+        string[index] = snippet.code;
       }
       return;
     });
     await Promise.all(childPromises);
-    return string.join("\n");
+    return string.filter(Boolean).join("\n");
   }
   function lineConditionalMatch(line, params) {
     const matches = [...line.matchAll(regexConditional)];
@@ -399,6 +399,22 @@ ${indent}`);
       const childCount = node.children.length.toString();
       paramsRaw["node.children"] = childCount;
       params["node.children"] = childCount;
+    }
+    if (node.type === "TEXT") {
+      paramsRaw["node.characters"] = node.characters;
+      params["node.characters"] = safeString(node.characters);
+      if (node.textStyleId) {
+        if (node.textStyleId === figma.mixed) {
+          paramsRaw["node.textStyle"] = "figma.mixed";
+          params["node.textStyle"] = "figma.mixed";
+        } else {
+          const style = figma.getStyleById(node.textStyleId);
+          if (style) {
+            paramsRaw["node.textStyle"] = style.name;
+            params["node.textStyle"] = safeString(style.name);
+          }
+        }
+      }
     }
     if (componentNode && "key" in componentNode) {
       paramsRaw["component.key"] = componentNode.key;
@@ -561,7 +577,7 @@ ${indent}`);
       }
     });
     const message = {
-      type: "EXPORT",
+      type: "BULK_EXPORT",
       code: JSON.stringify(data, null, 2)
     };
     figma.ui.postMessage(message);
@@ -589,7 +605,7 @@ ${indent}`);
       return into;
     }, componentData);
     const message = {
-      type: "COMPONENT_DATA",
+      type: "BULK_COMPONENT_DATA",
       code: JSON.stringify(data, null, 2)
     };
     figma.ui.postMessage(message);
@@ -604,7 +620,7 @@ ${indent}`);
       })
     );
     const message = {
-      type: "NODE_DATA",
+      type: "BULK_NODE_DATA",
       code: JSON.stringify(data, null, 2)
     };
     figma.ui.postMessage(message);
@@ -627,6 +643,32 @@ ${indent}`);
     return data;
   }
 
+  // src/templates.ts
+  var CLIENT_STORAGE_GLOBAL_TEMPLATES_KEY = "global-templates";
+  function templatesIsCodeSnippetGlobalTemplates(templates) {
+    if (typeof templates === "object" && !Array.isArray(templates)) {
+      const keys = Object.keys(templates);
+      if (keys.find((k) => k !== "components" && k !== "types")) {
+        return false;
+      }
+      return true;
+    }
+    return false;
+  }
+  async function getGlobalTemplatesFromClientStorage() {
+    const templates = await figma.clientStorage.getAsync(
+      CLIENT_STORAGE_GLOBAL_TEMPLATES_KEY
+    );
+    return templates && templatesIsCodeSnippetGlobalTemplates(templates) ? templates : null;
+  }
+  async function setGlobalTemplatesInClientStorage(templates) {
+    await figma.clientStorage.setAsync(
+      CLIENT_STORAGE_GLOBAL_TEMPLATES_KEY,
+      templates
+    );
+    return;
+  }
+
   // src/code.ts
   if (figma.mode === "codegen") {
     initializeCodegenMode();
@@ -637,17 +679,27 @@ ${indent}`);
     figma.codegen.on("preferenceschange", async (event) => {
       if (event.propertyName === "editor") {
         openCodeSnippetEditorUI();
+      } else if (event.propertyName === "templates") {
+        openTemplateUI();
       }
     });
-    figma.ui.on("message", async (event) => {
-      if (event.type === "INITIALIZE") {
-        handleCurrentSelection();
-      } else if (event.type === "SAVE") {
-        setCodegenResultsInPluginData(figma.currentPage.selection[0], event.data);
-      } else {
-        console.log("UNKNOWN EVENT", event);
+    figma.ui.on(
+      "message",
+      async (event) => {
+        if (event.type === "EDITOR_INITIALIZE") {
+          handleCurrentSelection();
+        } else if (event.type === "EDITOR_SAVE") {
+          setCodegenResultsInPluginData(
+            figma.currentPage.selection[0],
+            event.data
+          );
+        } else if (event.type === "TEMPLATES_DATA") {
+          setGlobalTemplatesInClientStorage(event.data);
+        } else {
+          console.log("UNKNOWN EVENT", event);
+        }
       }
-    });
+    );
     figma.on("selectionchange", () => handleCurrentSelection);
     figma.codegen.on("generate", async () => {
       try {
@@ -656,7 +708,12 @@ ${indent}`);
         const hasDefaultMessage = defaultSnippet === "message";
         const currentNode = handleCurrentSelection();
         const paramsMap = await paramsFromNode(currentNode);
-        const nodeSnippetTemplateDataArray = await nodeSnippetTemplateDataArrayFromNode(currentNode, paramsMap, {});
+        const templates = await getGlobalTemplatesFromClientStorage() || {};
+        const nodeSnippetTemplateDataArray = await nodeSnippetTemplateDataArrayFromNode(
+          currentNode,
+          paramsMap,
+          templates
+        );
         const snippets = codegenResultsFromNodeSnippetTemplateDataArray(
           nodeSnippetTemplateDataArray,
           isDetailsMode
@@ -694,15 +751,15 @@ ${indent}`);
   }
   function initializeDesignMode() {
     figma.ui.on("message", async (event) => {
-      if (event.type === "INITIALIZE") {
+      if (event.type === "BULK_INITIALIZE") {
         handleCurrentSelection();
-      } else if (event.type === "COMPONENT_DATA") {
+      } else if (event.type === "BULK_COMPONENT_DATA") {
         bulk.performGetComponentData();
-      } else if (event.type === "NODE_DATA") {
+      } else if (event.type === "BULK_NODE_DATA") {
         await bulk.performGetNodeData();
-      } else if (event.type === "EXPORT") {
+      } else if (event.type === "BULK_EXPORT") {
         bulk.performExport();
-      } else if (event.type === "IMPORT") {
+      } else if (event.type === "BULK_IMPORT") {
         bulk.performImport(event.data);
       }
     });
@@ -728,6 +785,16 @@ ${indent}`);
       themeColors: true
     });
   }
+  async function openTemplateUI() {
+    figma.showUI(__uiFiles__.templates, {
+      width: 600,
+      height: 600,
+      themeColors: true
+    });
+    const templates = await getGlobalTemplatesFromClientStorage() || "{}";
+    const message = { type: "TEMPLATES_INITIALIZE", templates };
+    figma.ui.postMessage(message);
+  }
   function codegenResultsFromNodeSnippetTemplateDataArray(nodeSnippetTemplateDataArray, isDetailsMode) {
     const codegenResult = [];
     nodeSnippetTemplateDataArray.forEach((nodeSnippetTemplateData) => {
@@ -750,7 +817,7 @@ ${indent}`);
       const nodeId = node ? node.id : null;
       const nodeType = node ? node.type : null;
       const message = {
-        type: "SELECTION",
+        type: "EDITOR_SELECTION",
         nodeId,
         nodeType,
         nodePluginData

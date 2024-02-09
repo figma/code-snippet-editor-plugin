@@ -13,6 +13,11 @@
       "label": "Open Editor"
     },
     {
+      "itemType": "action",
+      "propertyName": "templates",
+      "label": "Open Global Templates Editor"
+    },
+    {
       "itemType": "select",
       "propertyName": "defaultSnippet",
       "label": "Default snippet",
@@ -34,7 +39,8 @@
   "main": "code.js",
   "ui": {
     "bulk": "ui/bulk.html",
-    "editor": "ui/editor.html"
+    "editor": "ui/editor.html",
+    "templates": "ui/templates.html"
   },
   "networkAccess": { "allowedDomains": ["none"] }
 }

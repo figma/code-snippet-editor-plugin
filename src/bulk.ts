@@ -50,7 +50,7 @@ function performExport() {
     }
   });
   const message: EventToBulk = {
-    type: "EXPORT",
+    type: "BULK_EXPORT",
     code: JSON.stringify(data, null, 2),
   };
   figma.ui.postMessage(message);
@@ -84,7 +84,7 @@ function performGetComponentData() {
     return into;
   }, componentData);
   const message: EventToBulk = {
-    type: "COMPONENT_DATA",
+    type: "BULK_COMPONENT_DATA",
     code: JSON.stringify(data, null, 2),
   };
   figma.ui.postMessage(message);
@@ -105,7 +105,7 @@ async function performGetNodeData() {
     })
   );
   const message: EventToBulk = {
-    type: "NODE_DATA",
+    type: "BULK_NODE_DATA",
     code: JSON.stringify(data, null, 2),
   };
   figma.ui.postMessage(message);

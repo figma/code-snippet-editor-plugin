@@ -332,7 +332,7 @@ async function findChildrenSnippets(
   globalTemplates: CodeSnippetGlobalTemplates
 ): Promise<string> {
   const string: string[] = [];
-  const childPromises = nodeChildren.map(async (child) => {
+  const childPromises = nodeChildren.map(async (child, index) => {
     const paramsMap = await paramsFromNode(child);
     const snippets = await nodeSnippetTemplateDataArrayFromNode(
       child,
@@ -352,12 +352,12 @@ async function findChildrenSnippets(
       )
       .find(Boolean);
     if (snippet) {
-      string.push(snippet.code);
+      string[index] = snippet.code;
     }
     return;
   });
   await Promise.all(childPromises);
-  return string.join("\n");
+  return string.filter(Boolean).join("\n");
 }
 
 /**
