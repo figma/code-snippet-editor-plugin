@@ -8,6 +8,7 @@ Translate component variants, properties, and more into dynamic code snippets fo
 - [Templating](#templating)
   - [Symbols](#symbols)
   - [Escaping](#escaping)
+  - [Children](#children)
   - [Conditionals](#conditionals)
   - [Operators](#operators)
   - [Samples](#samples)
@@ -36,10 +37,11 @@ This plugin allows you to write and generate code snippets for Figma nodes, whic
 Snippet templates can represent code in any language. A JSX-style template for a main component like this:
 
 ```
-<Button 
+<Button
   onClick={() => {}}
   variant="{{property.variant}}"
   size="{{property.size}}"
+  iconEnd={<{{property.iconEnd|pascal}} />}
 >
   {{property.label}}
 </Button>
@@ -48,10 +50,11 @@ Snippet templates can represent code in any language. A JSX-style template for a
 ...when filled with a selected component instance's properties, will render an accurate code snippet in Figma like this:
 
 ```jsx
-<Button 
+<Button
   onClick={() => {}}
   variant="primary"
   size="large"
+  iconEnd={<IconArrowRight />}
 >
   Hello World!
 </Button>
@@ -88,6 +91,52 @@ For a line to render, the appropriate data must be present. If `something` was n
 If you need to write the text `"{{something}}"` explicitly in your rendered code, you can escape that text with a single backslash prefix like `"\{{something}}"`.
 
 A more realistic example is the Ember language which requires something like `<Button @label={{t "Value"}} />`. To achieve this, the template would escape the outer brackets with a single prefix. `<Button @label=\{{t "{{something}}"}} />`.
+
+### Children
+
+You may be interested in rendering nested component instances inside your template. `{{figma.children}}` is a special symbol that will render any immediate children inside the template.
+
+These children must have snippet templates defined on themselves with the same title and language as the parent template.
+
+Currently, `figma.children` only looks at immediate children, and will recurse up to 12 levels deep.
+
+Indentation for nested templates infers space or tab indents from the beginning of the line that calls `{{figma.children}}`. For example:
+
+A parent node has the template...
+
+```
+<p>
+  {{figma.children}}
+</p>
+```
+
+...and one of its children has the template...
+
+```
+<span>
+  Hello world!
+</span>
+```
+
+...when the parent is selected, it would render...
+
+```
+<p>
+  <span>
+    Hello world!
+  </span>
+</p>
+```
+
+...and when child is selected, it would render...
+
+```
+<span>
+  Hello world!
+</span>
+```
+
+The two spaces prefixing the `  {{figma.children}}` on the parent template are how the template knows how far in to indent the span.
 
 ### Conditionals
 
@@ -241,14 +290,19 @@ Contains output from [`node.getCSSAsync()`](https://www.figma.com/plugin-docs/ap
 }
 ```
 
+### `figma`
+
+`figma` is not expressed as values in the params object, but rather as the name space for special symbols. Currently [`figma.children`](#children) is the only symbol in this namespace.
+
 ### `node`
 
-Contains the name and type for the selected node. If a Component or ComponentSet, `node.key` will also be provided.
+Contains the name, type, and child count (when applicable) for the selected node. If a Component or ComponentSet, `node.key` will also be provided.
 
 ```json
 {
   "node.name": "icon-heart",
-  "node.type": "instance"
+  "node.type": "instance",
+  "node.children": "0"
 }
 ```
 
