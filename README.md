@@ -17,10 +17,12 @@ Translate component variants, properties, and more into dynamic code snippets fo
   - [`autolayout`](#autolayout)
   - [`component`](#component)
   - [`css`](#css)
+  - [`figma`](#figma)
   - [`node`](#node)
   - [`property`](#property)
   - [`variables`](#variables)
 - [Filters](#filters)
+- [Global Templates](#global-templates)
 - [“Details mode”](#details-mode)
 - [Bulk Operations](#bulk-operations)
   - [Import/Export](#importexport)
@@ -308,6 +310,15 @@ Contains the name, type, and child count (when applicable) for the selected node
 }
 ```
 
+For text nodes, `node.characters` will be available. When text styles are applied to the node, `node.textStyle` will be present. Mixed text styles will have a value of [`"figma.mixed"`](https://www.figma.com/plugin-docs/api/properties/figma-mixed/).
+
+```json
+{
+  "node.characters": "hello world",
+  "node.textStyle": "heading-01"
+}
+```
+
 ### `property`
 
 If the current node is a Component/Instance containing component properties, these will be under the `property.*` params namespace. A basic button component might look like this:
@@ -386,6 +397,43 @@ figmaIsGreat
 figma-is-great
 FIGMA_IS_GREAT
 ```
+
+## Global Templates
+
+Templates can also be stored in Figma's [clientStorage](https://www.figma.com/plugin-docs/api/figma-clientStorage/). This is the only way to store templates for non-component nodes in a way that all nodes can inherit them.
+
+These templates are stored in an object with the following schema:
+
+```json
+{
+  "types": {
+    "FRAME": [
+      {
+        "title": "Sample",
+        "language": "HTML",
+        "code": "<p>Hello world! {{node.name}}</p>"
+      }
+    ]
+  },
+  "components": {
+    "componentKeyABC123": [
+      {
+        "title": "Sample React",
+        "language": "JAVASCRIPT",
+        "code": "<MyComponent />"
+      }
+    ]
+  }
+}
+```
+
+Check out [./src/index.d.ts](./src/index.d.ts) for documentation on the `CodeSnippetGlobalTemplates` type.
+
+See [./examples.json](./examples.json) for real world examples.
+
+> Important: Figma's client storage is local to the user, device, and Figma context. If you save global templates in the Figma app and then open Figma in the web browser, the templates will not be available.
+
+Syncing this JSON exernally is on the roadmap, but for now, the only way to add global templates is to select "Open Global Template Editor" from the plugin settings menu, paste the JSON into the text box, and hit save.
 
 ## “Details Mode”
 
