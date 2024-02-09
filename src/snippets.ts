@@ -1,4 +1,7 @@
+import { paramsFromNode } from "./params";
 import { getCodegenResultsFromPluginData } from "./pluginData";
+
+const MAX_RECURSION = 12;
 
 /**
  * Regular expression for finding symbols, aka {{property.variant}} in a string.
@@ -55,15 +58,20 @@ const regexConditional = new RegExp(
  * For component-like nodes, this will discover inherited templates (component set > component > instance).
  * @param node the node to find relevant snippets for from plugin data
  * @param codeSnippetParamsMap the map of params that can fill the templates
+ * @param globalTemplates CodeSnippetGlobalTemplates
+ * @param indent optional indent level to prepend to each line
  * @returns NodeSnippetTemplateData array containing hydrated snippets for the current node.
  */
 export async function nodeSnippetTemplateDataArrayFromNode(
   node: SceneNode,
   codeSnippetParamsMap: CodeSnippetParamsMap,
-  globalTemplates?: CodeSnippetGlobalTemplates
+  globalTemplates: CodeSnippetGlobalTemplates,
+  indent: string = "",
+  recursionIndex = 0
 ): Promise<NodeSnippetTemplateData[]> {
   const nodeSnippetTemplateDataArray: NodeSnippetTemplateData[] = [];
   const seenSnippetTemplates: { [k: string]: number } = {};
+  if (recursionIndex >= 10) return nodeSnippetTemplateDataArray;
 
   /**
    * Process snippets for any node. Called multiple times up the lineage for component and instance nodes.
@@ -72,8 +80,8 @@ export async function nodeSnippetTemplateDataArrayFromNode(
    * @param node the node to check for templates in plugin data
    * @returns Promise<void> will push into nodeSnippetTemplateDataArray.
    */
-  async function processSnippetTemplatesForNode(node: SceneNode) {
-    const codegenResults = getCodegenResultsFromPluginData(node);
+  async function processSnippetTemplatesForNode(snippetNode: SceneNode) {
+    const codegenResults = getCodegenResultsFromPluginData(snippetNode);
     const codegenResultTemplates: CodegenResult[] = [];
     if (codegenResults.length) {
       const seenKey = JSON.stringify(codegenResults);
@@ -84,15 +92,24 @@ export async function nodeSnippetTemplateDataArrayFromNode(
     }
     if (globalTemplates) {
       const componentTemplates =
-        "key" in node ? globalTemplates.components[node.key] || [] : [];
-      const typeTemplates = globalTemplates.types[node.type] || [];
+        "key" in snippetNode && globalTemplates.components
+          ? globalTemplates.components[snippetNode.key] || []
+          : [];
+      const typeTemplates = globalTemplates.types
+        ? globalTemplates.types[snippetNode.type] || []
+        : [];
       codegenResultTemplates.push(...componentTemplates);
       codegenResultTemplates.push(...typeTemplates);
     }
+    const children = "children" in node ? node.children : [];
     const nodeSnippetTemplateData = await hydrateSnippets(
       codegenResultTemplates,
       codeSnippetParamsMap,
-      node.type
+      snippetNode.type,
+      children,
+      indent,
+      recursionIndex,
+      globalTemplates
     );
     nodeSnippetTemplateDataArray.push(nodeSnippetTemplateData);
   }
@@ -164,83 +181,163 @@ export function transformStringWithFilter(
  * Fill templates with code snippet params.
  * @param codegenResultTemplatesArray codegen result array of templates loaded from pluginData or global templates.
  * @param codeSnippetParamsMap the map of raw and sanitized params used to hydrate the template.
+ * @param nodeType string for the type of node the template is coming from. used in the title in details mode.
+ * @param children an array of child nodes
+ * @param indent the string to use for indent on children
+ * @param recursionIndex how deep are we in recursion
+ * @param globalTemplates the global templates object for component key or node type based templates
  * @returns a Promise resolving NodeSnippetTemplateData
  */
 export async function hydrateSnippets(
   codegenResultTemplatesArray: CodegenResult[],
   codeSnippetParamsMap: CodeSnippetParamsMap,
-  nodeType: string
+  nodeType: string,
+  nodeChildren: readonly SceneNode[],
+  indent: string,
+  recursionIndex: number,
+  globalTemplates: CodeSnippetGlobalTemplates
 ): Promise<NodeSnippetTemplateData> {
   const { paramsRaw, params } = codeSnippetParamsMap;
   const codegenResultArray: CodegenResult[] = [];
   const codegenResultRawTemplatesArray: CodegenResult[] = [];
 
-  codegenResultTemplatesArray.forEach((codegenResult) => {
-    const lines = codegenResult.code.split("\n");
-    const code: string[] = [];
-    lines.forEach((line) => {
-      const [matches, qualifies] = lineConditionalMatch(line, params);
-      matches.forEach((match) => {
-        line = line.replace(match[0], "");
-      });
-
-      const symbolMatches = [...line.matchAll(regexSymbols)];
-      if (qualifies && symbolMatches.length) {
-        let succeeded = true;
-        symbolMatches.forEach((symbolMatch) => {
-          const [match, param, _, filter] = symbolMatch.map((a) =>
-            a ? a.trim() : a
-          ) as [string, string, string, SnippetStringFilter];
-          if (param in params) {
-            const value = transformStringWithFilter(
-              params[param],
-              paramsRaw[param],
-              filter
-            );
-            line = line.replace(match, value);
-          } else if (param === "figma.children") {
-            console.log("HELLO WORLD");
-          } else {
-            succeeded = false;
-          }
+  const resultPromises = codegenResultTemplatesArray.map(
+    async (codegenResult) => {
+      const lines = codegenResult.code.split("\n");
+      const code: string[] = [];
+      for (let i = 0; i < lines.length; i++) {
+        let line = lines[i];
+        const [matches, qualifies] = lineConditionalMatch(line, params);
+        matches.forEach((match) => {
+          line = line.replace(match[0], "");
         });
-        if (succeeded) {
+
+        const symbolMatches = [...line.matchAll(regexSymbols)];
+        if (qualifies && symbolMatches.length) {
+          let succeeded = true;
+          for (let j = 0; j < symbolMatches.length; j++) {
+            const symbolMatch = symbolMatches[j];
+            const [match, param, _, filter] = symbolMatch.map((a) =>
+              a ? a.trim() : a
+            ) as [string, string, string, SnippetStringFilter];
+            if (param in params) {
+              const value = transformStringWithFilter(
+                params[param],
+                paramsRaw[param],
+                filter
+              );
+              line = line.replace(match, value);
+            } else if (
+              param === "figma.children" &&
+              recursionIndex < MAX_RECURSION
+            ) {
+              const indentMatch = line.match(/^[ \t]+/);
+              const indent = indentMatch ? indentMatch[0] : "";
+              const value = await findChildrenSnippets(
+                codegenResult,
+                nodeChildren,
+                indent,
+                recursionIndex + 1,
+                globalTemplates
+              );
+              if (value) {
+                line = line.replace(/^[ \t]+/, "");
+                line = line.replace(match, value);
+              } else {
+                succeeded = false;
+              }
+            } else {
+              succeeded = false;
+            }
+          }
+
+          if (succeeded) {
+            line = unescapeBrackets(line);
+            code.push(line);
+          }
+        } else if (qualifies) {
           line = unescapeBrackets(line);
           code.push(line);
         }
-      } else if (qualifies) {
-        line = unescapeBrackets(line);
-        code.push(line);
       }
-    });
 
-    /**
-     * Single line syntax collapses "/" prefix and suffix into single line spaces
-     * https://github.com/figma/code-snippet-editor-plugin#single-line-syntax
-     */
-    const codeString = code
-      .join("\n")
-      .replace(/\\\\\n/g, "") // collapse single line leading space
-      .replace(/\\\n\\/g, "") // collapse single line trailing space
-      .replace(/\\\n/g, " "); // collapse single line
+      /**
+       * Single line syntax collapses "/" prefix and suffix into single line spaces
+       * https://github.com/figma/code-snippet-editor-plugin#single-line-syntax
+       */
+      const codeString = code
+        .join("\n")
+        .replace(/\\\\\n/g, "") // collapse single line leading space
+        .replace(/\\\n\\/g, "") // collapse single line trailing space
+        .replace(/\\\n/g, " "); // collapse single line
 
-    codegenResultArray.push({
-      title: codegenResult.title,
-      language: codegenResult.language,
-      code: codeString,
-    });
+      /**
+       * Prepend indent to every line.
+       */
+      const indentedCodeString =
+        indent + codeString.replace(/\n/g, `\n${indent}`);
 
-    codegenResultRawTemplatesArray.push({
-      title: `${codegenResult.title}: Template (${nodeType})`,
-      language: "PLAINTEXT",
-      code: codegenResult.code,
-    });
-  });
+      codegenResultArray.push({
+        title: codegenResult.title,
+        language: codegenResult.language,
+        code: indentedCodeString,
+      });
+
+      codegenResultRawTemplatesArray.push({
+        title: `${codegenResult.title}: Template (${nodeType})`,
+        language: "PLAINTEXT",
+        code: codegenResult.code,
+      });
+
+      return;
+    }
+  );
+
+  await Promise.all(resultPromises);
 
   return {
     codegenResultRawTemplatesArray,
     codegenResultArray,
   };
+}
+
+/**
+ *
+ */
+async function findChildrenSnippets(
+  codegenResult: CodegenResult,
+  nodeChildren: readonly SceneNode[],
+  indent: string,
+  recursionIndex: number,
+  globalTemplates: CodeSnippetGlobalTemplates
+): Promise<string> {
+  const string: string[] = [];
+  const childPromises = nodeChildren.map(async (child) => {
+    const paramsMap = await paramsFromNode(child);
+    // TODO: parameter for this function to filter out irrelevant templates.
+    const snippets = await nodeSnippetTemplateDataArrayFromNode(
+      child,
+      paramsMap,
+      globalTemplates,
+      indent,
+      recursionIndex + 1
+    );
+    const snippet = snippets
+      .map((s) =>
+        s.codegenResultArray.find(
+          (r) =>
+            r.title === codegenResult.title &&
+            r.language === codegenResult.language
+        )
+      )
+      .find(Boolean);
+    if (snippet) {
+      string.push(snippet.code);
+    }
+    return;
+  });
+  await Promise.all(childPromises);
+  return string.join("\n");
 }
 
 /**

@@ -4,8 +4,8 @@
  *  "types" is a map binding  NodeTypes to codegen result arrays.
  */
 type CodeSnippetGlobalTemplates = {
-  components: CodegenResultTemplatesByComponentKey;
-  types: { [K in NodeType]?: CodegenResult[] };
+  components?: CodegenResultTemplatesByComponentKey;
+  types?: { [K in NodeType]?: CodegenResult[] };
 };
 
 /**
