@@ -530,6 +530,8 @@ ${indent}`);
     "{{!1=1}}not1": "",
     "{{!1=2}}not1": "not1",
     "{{?1=1&2=2}}{{!hello=cheese}}compound": "compound",
+    "{{figma.children}}": "",
+    "Hello, {{figma.children}}": "",
     "{{1}}{{hello}}{{2}}": "1world2",
     "{{1}}{{invalid}}{{2}}": ""
   };
