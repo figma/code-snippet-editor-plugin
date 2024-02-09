@@ -59,7 +59,9 @@ const regexConditional = new RegExp(
  * @param node the node to find relevant snippets for from plugin data
  * @param codeSnippetParamsMap the map of params that can fill the templates
  * @param globalTemplates CodeSnippetGlobalTemplates
- * @param indent optional indent level to prepend to each line
+ * @param indent the indentation string
+ * @param recursionIndex tracking recursion to prevent infinite loops
+ * @param parentCodegenResult If present, template language and title must match this. Used to filter out templates up front during recursion.
  * @returns NodeSnippetTemplateData array containing hydrated snippets for the current node.
  */
 export async function nodeSnippetTemplateDataArrayFromNode(
@@ -67,11 +69,11 @@ export async function nodeSnippetTemplateDataArrayFromNode(
   codeSnippetParamsMap: CodeSnippetParamsMap,
   globalTemplates: CodeSnippetGlobalTemplates,
   indent: string = "",
-  recursionIndex = 0
+  recursionIndex = 0,
+  parentCodegenResult?: CodegenResult
 ): Promise<NodeSnippetTemplateData[]> {
   const nodeSnippetTemplateDataArray: NodeSnippetTemplateData[] = [];
   const seenSnippetTemplates: { [k: string]: number } = {};
-  if (recursionIndex >= 10) return nodeSnippetTemplateDataArray;
 
   /**
    * Process snippets for any node. Called multiple times up the lineage for component and instance nodes.
@@ -82,12 +84,20 @@ export async function nodeSnippetTemplateDataArrayFromNode(
    */
   async function processSnippetTemplatesForNode(snippetNode: SceneNode) {
     const codegenResults = getCodegenResultsFromPluginData(snippetNode);
+    const matchingTemplates = (templates: CodegenResult[]) =>
+      templates.filter(
+        ({ title, language }) =>
+          !parentCodegenResult ||
+          (title === parentCodegenResult.title &&
+            language === parentCodegenResult.language)
+      );
+    const matchingCodegenResults = matchingTemplates(codegenResults);
     const codegenResultTemplates: CodegenResult[] = [];
-    if (codegenResults.length) {
-      const seenKey = JSON.stringify(codegenResults);
+    if (matchingCodegenResults.length) {
+      const seenKey = JSON.stringify(matchingCodegenResults);
       if (!seenSnippetTemplates[seenKey]) {
         seenSnippetTemplates[seenKey] = 1;
-        codegenResultTemplates.push(...codegenResults);
+        codegenResultTemplates.push(...matchingCodegenResults);
       }
     }
     if (globalTemplates) {
@@ -98,8 +108,8 @@ export async function nodeSnippetTemplateDataArrayFromNode(
       const typeTemplates = globalTemplates.types
         ? globalTemplates.types[snippetNode.type] || []
         : [];
-      codegenResultTemplates.push(...componentTemplates);
-      codegenResultTemplates.push(...typeTemplates);
+      codegenResultTemplates.push(...matchingTemplates(componentTemplates));
+      codegenResultTemplates.push(...matchingTemplates(typeTemplates));
     }
     const children = "children" in node ? node.children : [];
     const nodeSnippetTemplateData = await hydrateSnippets(
@@ -303,6 +313,12 @@ export async function hydrateSnippets(
 
 /**
  *
+ * @param codegenResult the template children snippets are being inserted inside of. title and language must map and children templates
+ * @param nodeChildren an array of the children to search for templates on
+ * @param indent the indentation string
+ * @param recursionIndex tracking recursion to prevent infinite loops
+ * @param globalTemplates the CodeSnippetGlobalTemplates to reference
+ * @returns a Promise that resolves a string of all children snippets with the right indentation.
  */
 async function findChildrenSnippets(
   codegenResult: CodegenResult,
@@ -314,13 +330,13 @@ async function findChildrenSnippets(
   const string: string[] = [];
   const childPromises = nodeChildren.map(async (child) => {
     const paramsMap = await paramsFromNode(child);
-    // TODO: parameter for this function to filter out irrelevant templates.
     const snippets = await nodeSnippetTemplateDataArrayFromNode(
       child,
       paramsMap,
       globalTemplates,
       indent,
-      recursionIndex + 1
+      recursionIndex + 1,
+      codegenResult
     );
     const snippet = snippets
       .map((s) =>

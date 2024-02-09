@@ -92,6 +92,11 @@
       paramsRaw["node.key"] = node.key;
       params["node.key"] = node.key;
     }
+    if ("children" in node) {
+      const childCount = node.children.length.toString();
+      paramsRaw["node.children"] = childCount;
+      params["node.children"] = childCount;
+    }
     if (componentNode && "key" in componentNode) {
       paramsRaw["component.key"] = componentNode.key;
       paramsRaw["component.type"] = componentNode.type;
@@ -305,26 +310,28 @@
     `{{([?!])(${regexConditionals})}}`,
     "g"
   );
-  async function nodeSnippetTemplateDataArrayFromNode(node, codeSnippetParamsMap, globalTemplates, indent = "", recursionIndex = 0) {
+  async function nodeSnippetTemplateDataArrayFromNode(node, codeSnippetParamsMap, globalTemplates, indent = "", recursionIndex = 0, parentCodegenResult) {
     const nodeSnippetTemplateDataArray = [];
     const seenSnippetTemplates = {};
-    if (recursionIndex >= 10)
-      return nodeSnippetTemplateDataArray;
     async function processSnippetTemplatesForNode(snippetNode) {
       const codegenResults = getCodegenResultsFromPluginData(snippetNode);
+      const matchingTemplates = (templates) => templates.filter(
+        ({ title, language }) => !parentCodegenResult || title === parentCodegenResult.title && language === parentCodegenResult.language
+      );
+      const matchingCodegenResults = matchingTemplates(codegenResults);
       const codegenResultTemplates = [];
-      if (codegenResults.length) {
-        const seenKey = JSON.stringify(codegenResults);
+      if (matchingCodegenResults.length) {
+        const seenKey = JSON.stringify(matchingCodegenResults);
         if (!seenSnippetTemplates[seenKey]) {
           seenSnippetTemplates[seenKey] = 1;
-          codegenResultTemplates.push(...codegenResults);
+          codegenResultTemplates.push(...matchingCodegenResults);
         }
       }
       if (globalTemplates) {
         const componentTemplates = "key" in snippetNode && globalTemplates.components ? globalTemplates.components[snippetNode.key] || [] : [];
         const typeTemplates = globalTemplates.types ? globalTemplates.types[snippetNode.type] || [] : [];
-        codegenResultTemplates.push(...componentTemplates);
-        codegenResultTemplates.push(...typeTemplates);
+        codegenResultTemplates.push(...matchingTemplates(componentTemplates));
+        codegenResultTemplates.push(...matchingTemplates(typeTemplates));
       }
       const children = "children" in node ? node.children : [];
       const nodeSnippetTemplateData = await hydrateSnippets(
@@ -459,7 +466,8 @@ ${indent}`);
         paramsMap,
         globalTemplates,
         indent,
-        recursionIndex + 1
+        recursionIndex + 1,
+        codegenResult
       );
       const snippet = snippets.map(
         (s) => s.codegenResultArray.find(
