@@ -162,7 +162,7 @@
     const codegenResultArray = [];
     const codegenResultRawTemplatesArray = [];
     const resultPromises = codegenResultTemplatesArray.map(
-      async (codegenResult) => {
+      async (codegenResult, index) => {
         const lines = codegenResult.code.split("\n");
         const code = [];
         for (let i = 0; i < lines.length; i++) {
@@ -218,16 +218,16 @@
         const codeString = code.join("\n").replace(/\\\\\n/g, "").replace(/\\\n\\/g, "").replace(/\\\n/g, " ");
         const indentedCodeString = indent + codeString.replace(/\n/g, `
 ${indent}`);
-        codegenResultArray.push({
+        codegenResultArray[index] = {
           title: codegenResult.title,
           language: codegenResult.language,
           code: indentedCodeString
-        });
-        codegenResultRawTemplatesArray.push({
+        };
+        codegenResultRawTemplatesArray[index] = {
           title: `${codegenResult.title}: Template (${nodeType})`,
           language: "PLAINTEXT",
           code: codegenResult.code
-        });
+        };
         return;
       }
     );
