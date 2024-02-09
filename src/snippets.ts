@@ -216,7 +216,7 @@ export async function hydrateSnippets(
   const codegenResultRawTemplatesArray: CodegenResult[] = [];
 
   const resultPromises = codegenResultTemplatesArray.map(
-    async (codegenResult) => {
+    async (codegenResult, index) => {
       const lines = codegenResult.code.split("\n");
       const code: string[] = [];
       for (let i = 0; i < lines.length; i++) {
@@ -291,17 +291,17 @@ export async function hydrateSnippets(
       const indentedCodeString =
         indent + codeString.replace(/\n/g, `\n${indent}`);
 
-      codegenResultArray.push({
+      codegenResultArray[index] = {
         title: codegenResult.title,
         language: codegenResult.language,
         code: indentedCodeString,
-      });
+      };
 
-      codegenResultRawTemplatesArray.push({
+      codegenResultRawTemplatesArray[index] = {
         title: `${codegenResult.title}: Template (${nodeType})`,
         language: "PLAINTEXT",
         code: codegenResult.code,
-      });
+      };
 
       return;
     }
