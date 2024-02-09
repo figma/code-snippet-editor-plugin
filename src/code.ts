@@ -5,7 +5,10 @@ import {
 } from "./pluginData";
 import { paramsFromNode } from "./params";
 import { nodeSnippetTemplateDataArrayFromNode } from "./snippets";
-import { templates } from "./templates";
+import {
+  getGlobalTemplatesFromClientStorage,
+  setGlobalTemplatesInClientStorage,
+} from "./templates";
 
 if (figma.mode === "codegen") {
   initializeCodegenMode();
@@ -26,6 +29,8 @@ function initializeCodegenMode() {
   figma.codegen.on("preferenceschange", async (event) => {
     if (event.propertyName === "editor") {
       openCodeSnippetEditorUI();
+    } else if (event.propertyName === "templates") {
+      openTemplateUI();
     }
   });
 
@@ -34,15 +39,23 @@ function initializeCodegenMode() {
    *  - INITIALIZE: requesting initial data about the current selection when it opens
    *  - SAVE: providing template data for the plugin to save on the current selection
    */
-  figma.ui.on("message", async (event: EventFromEditor) => {
-    if (event.type === "INITIALIZE") {
-      handleCurrentSelection();
-    } else if (event.type === "SAVE") {
-      setCodegenResultsInPluginData(figma.currentPage.selection[0], event.data);
-    } else {
-      console.log("UNKNOWN EVENT", event);
+  figma.ui.on(
+    "message",
+    async (event: EventFromEditor | EventFromTemplates) => {
+      if (event.type === "EDITOR_INITIALIZE") {
+        handleCurrentSelection();
+      } else if (event.type === "EDITOR_SAVE") {
+        setCodegenResultsInPluginData(
+          figma.currentPage.selection[0],
+          event.data
+        );
+      } else if (event.type === "TEMPLATES_DATA") {
+        setGlobalTemplatesInClientStorage(event.data);
+      } else {
+        console.log("UNKNOWN EVENT", event);
+      }
     }
-  });
+  );
 
   /**
    * When the selection changes we want to rerun the code that handles a new node.
@@ -66,6 +79,7 @@ function initializeCodegenMode() {
       const currentNode = handleCurrentSelection();
 
       const paramsMap = await paramsFromNode(currentNode);
+      const templates = (await getGlobalTemplatesFromClientStorage()) || {};
       const nodeSnippetTemplateDataArray =
         await nodeSnippetTemplateDataArrayFromNode(
           currentNode,
@@ -126,15 +140,15 @@ function initializeCodegenMode() {
  */
 function initializeDesignMode() {
   figma.ui.on("message", async (event: EventFromBulk) => {
-    if (event.type === "INITIALIZE") {
+    if (event.type === "BULK_INITIALIZE") {
       handleCurrentSelection();
-    } else if (event.type === "COMPONENT_DATA") {
+    } else if (event.type === "BULK_COMPONENT_DATA") {
       bulk.performGetComponentData();
-    } else if (event.type === "NODE_DATA") {
+    } else if (event.type === "BULK_NODE_DATA") {
       await bulk.performGetNodeData();
-    } else if (event.type === "EXPORT") {
+    } else if (event.type === "BULK_EXPORT") {
       bulk.performExport();
-    } else if (event.type === "IMPORT") {
+    } else if (event.type === "BULK_IMPORT") {
       bulk.performImport(event.data);
     }
   });
@@ -165,6 +179,19 @@ function openCodeSnippetEditorUI() {
     height: finalHeight,
     themeColors: true,
   });
+}
+/**
+ * Opening the UI for templates and sending a message with the initial template data
+ */
+async function openTemplateUI() {
+  figma.showUI(__uiFiles__.templates, {
+    width: 600,
+    height: 600,
+    themeColors: true,
+  });
+  const templates = (await getGlobalTemplatesFromClientStorage()) || "{}";
+  const message: EventToTemplates = { type: "TEMPLATES_INITIALIZE", templates };
+  figma.ui.postMessage(message);
 }
 
 /**
@@ -211,7 +238,7 @@ function handleCurrentSelection() {
     const nodeId = node ? node.id : null;
     const nodeType = node ? node.type : null;
     const message: EventToEditor = {
-      type: "SELECTION",
+      type: "EDITOR_SELECTION",
       nodeId,
       nodeType,
       nodePluginData,

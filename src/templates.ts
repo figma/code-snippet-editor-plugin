@@ -1,4 +1,56 @@
-export const templates: CodeSnippetGlobalTemplates = {
+const CLIENT_STORAGE_GLOBAL_TEMPLATES_KEY = "global-templates";
+
+/**
+ * Type safety function to indicate if item in clientStorage is CodeSnippetGlobalTemplates or not.
+ * @param templates item in question
+ * @returns whether or not the argument is CodeSnippetGlobalTemplates
+ */
+function templatesIsCodeSnippetGlobalTemplates(
+  templates: CodeSnippetGlobalTemplates | any
+): templates is CodeSnippetGlobalTemplates {
+  if (typeof templates === "object" && !Array.isArray(templates)) {
+    const keys = Object.keys(templates);
+    if (keys.find((k) => k !== "components" && k !== "types")) {
+      return false;
+    }
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Finding global templates stored in figma clientStorage
+ * https://www.figma.com/plugin-docs/api/figma-clientStorage
+ * @returns Promise resolving CodeSnippetGlobalTemplates object or null
+ */
+export async function getGlobalTemplatesFromClientStorage(): Promise<CodeSnippetGlobalTemplates | null> {
+  const templates = await figma.clientStorage.getAsync(
+    CLIENT_STORAGE_GLOBAL_TEMPLATES_KEY
+  );
+  return templates && templatesIsCodeSnippetGlobalTemplates(templates)
+    ? templates
+    : null;
+}
+
+/**
+ * Saving templates in client storage.
+ * @param templates CodeSnippetGlobalTemplates object to save in figma clientStorage
+ * @returns Promise resolve void
+ */
+export async function setGlobalTemplatesInClientStorage(
+  templates: CodeSnippetGlobalTemplates
+): Promise<void> {
+  await figma.clientStorage.setAsync(
+    CLIENT_STORAGE_GLOBAL_TEMPLATES_KEY,
+    templates
+  );
+  return;
+}
+
+/**
+ * Example templates you could import directly via the plugin.
+ */
+const templatesExamples: CodeSnippetGlobalTemplates = {
   components: {},
   types: {
     FRAME: [

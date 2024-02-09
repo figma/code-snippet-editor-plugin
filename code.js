@@ -19,7 +19,7 @@
     "RUST",
     "SQL",
     "SWIFT",
-    "TYPESCRIPT",
+    "TYPESCRIPT"
   ];
   function getCodegenResultsFromPluginData(node) {
     const pluginData = node.getSharedPluginData(
@@ -40,8 +40,10 @@
     return CODEGEN_LANGUAGES.includes(value);
   }
   function objectIsCodegenResult(object) {
-    if (typeof object !== "object") return false;
-    if (Object.keys(object).length !== 3) return false;
+    if (typeof object !== "object")
+      return false;
+    if (Object.keys(object).length !== 3)
+      return false;
     if (!("title" in object && "code" in object && "language" in object))
       return false;
     if (typeof object.title !== "string" || typeof object.code !== "string")
@@ -62,7 +64,8 @@
     return valid;
   }
   function pluginDataStringAsValidCodegenResults(pluginDataString) {
-    if (!pluginDataString) return null;
+    if (!pluginDataString)
+      return null;
     try {
       const parsed = JSON.parse(pluginDataString);
       return arrayContainsCodegenResults(parsed) ? parsed : null;
@@ -81,28 +84,20 @@
   var regexConditionals = [
     regexConditionalSingle,
     regexConditionalOr,
-    regexConditionalAnd,
+    regexConditionalAnd
   ].join("|");
-  var regexConditional = new RegExp(`{{([?!])(${regexConditionals})}}`, "g");
-  async function nodeSnippetTemplateDataArrayFromNode(
-    node,
-    codeSnippetParamsMap,
-    globalTemplates,
-    indent = "",
-    recursionIndex = 0,
-    parentCodegenResult
-  ) {
+  var regexConditional = new RegExp(
+    `{{([?!])(${regexConditionals})}}`,
+    "g"
+  );
+  async function nodeSnippetTemplateDataArrayFromNode(node, codeSnippetParamsMap, globalTemplates, indent = "", recursionIndex = 0, parentCodegenResult) {
     const nodeSnippetTemplateDataArray = [];
     const seenSnippetTemplates = {};
     async function processSnippetTemplatesForNode(snippetNode) {
       const codegenResults = getCodegenResultsFromPluginData(snippetNode);
-      const matchingTemplates = (templates2) =>
-        templates2.filter(
-          ({ title, language }) =>
-            !parentCodegenResult ||
-            (title === parentCodegenResult.title &&
-              language === parentCodegenResult.language)
-        );
+      const matchingTemplates = (templates) => templates.filter(
+        ({ title, language }) => !parentCodegenResult || title === parentCodegenResult.title && language === parentCodegenResult.language
+      );
       const matchingCodegenResults = matchingTemplates(codegenResults);
       const codegenResultTemplates = [];
       if (matchingCodegenResults.length) {
@@ -113,13 +108,8 @@
         }
       }
       if (globalTemplates) {
-        const componentTemplates =
-          "key" in snippetNode && globalTemplates.components
-            ? globalTemplates.components[snippetNode.key] || []
-            : [];
-        const typeTemplates = globalTemplates.types
-          ? globalTemplates.types[snippetNode.type] || []
-          : [];
+        const componentTemplates = "key" in snippetNode && globalTemplates.components ? globalTemplates.components[snippetNode.key] || [] : [];
+        const typeTemplates = globalTemplates.types ? globalTemplates.types[snippetNode.type] || [] : [];
         codegenResultTemplates.push(...matchingTemplates(componentTemplates));
         codegenResultTemplates.push(...matchingTemplates(typeTemplates));
       }
@@ -139,18 +129,11 @@
     if (node.type === "INSTANCE") {
       if (node.mainComponent) {
         await processSnippetTemplatesForNode(node.mainComponent);
-        if (
-          node.mainComponent.parent &&
-          node.mainComponent.parent.type === "COMPONENT_SET"
-        ) {
+        if (node.mainComponent.parent && node.mainComponent.parent.type === "COMPONENT_SET") {
           await processSnippetTemplatesForNode(node.mainComponent.parent);
         }
       }
-    } else if (
-      node.type === "COMPONENT" &&
-      node.parent &&
-      node.parent.type === "COMPONENT_SET"
-    ) {
+    } else if (node.type === "COMPONENT" && node.parent && node.parent.type === "COMPONENT_SET") {
       await processSnippetTemplatesForNode(node.parent);
     }
     return nodeSnippetTemplateDataArray;
@@ -160,9 +143,7 @@
     const capitalize2 = (s) => s.charAt(0).toUpperCase() + s.substring(1);
     switch (filter) {
       case "camel":
-        return splitString
-          .map((word, i) => (i === 0 ? word : capitalize2(word)))
-          .join("");
+        return splitString.map((word, i) => i === 0 ? word : capitalize2(word)).join("");
       case "constant":
         return splitString.join("_").toUpperCase();
       case "hyphen":
@@ -176,15 +157,7 @@
     }
     return splitString.join(" ");
   }
-  async function hydrateSnippets(
-    codegenResultTemplatesArray,
-    codeSnippetParamsMap,
-    nodeType,
-    nodeChildren,
-    indent,
-    recursionIndex,
-    globalTemplates
-  ) {
+  async function hydrateSnippets(codegenResultTemplatesArray, codeSnippetParamsMap, nodeType, nodeChildren, indent, recursionIndex, globalTemplates) {
     const { paramsRaw, params } = codeSnippetParamsMap;
     const codegenResultArray = [];
     const codegenResultRawTemplatesArray = [];
@@ -203,8 +176,8 @@
             let succeeded = true;
             for (let j = 0; j < symbolMatches.length; j++) {
               const symbolMatch = symbolMatches[j];
-              const [match, param, _, filter] = symbolMatch.map((a) =>
-                a ? a.trim() : a
+              const [match, param, _, filter] = symbolMatch.map(
+                (a) => a ? a.trim() : a
               );
               if (param in params) {
                 const value = transformStringWithFilter(
@@ -213,10 +186,7 @@
                   filter
                 );
                 line = line.replace(match, value);
-              } else if (
-                param === "figma.children" &&
-                recursionIndex < MAX_RECURSION
-              ) {
+              } else if (param === "figma.children" && recursionIndex < MAX_RECURSION) {
                 const indentMatch = line.match(/^[ \t]+/);
                 const indent2 = indentMatch ? indentMatch[0] : "";
                 const value = await findChildrenSnippets(
@@ -245,27 +215,18 @@
             code.push(line);
           }
         }
-        const codeString = code
-          .join("\n")
-          .replace(/\\\\\n/g, "")
-          .replace(/\\\n\\/g, "")
-          .replace(/\\\n/g, " ");
-        const indentedCodeString =
-          indent +
-          codeString.replace(
-            /\n/g,
-            `
-${indent}`
-          );
+        const codeString = code.join("\n").replace(/\\\\\n/g, "").replace(/\\\n\\/g, "").replace(/\\\n/g, " ");
+        const indentedCodeString = indent + codeString.replace(/\n/g, `
+${indent}`);
         codegenResultArray[index] = {
           title: codegenResult.title,
           language: codegenResult.language,
-          code: indentedCodeString,
+          code: indentedCodeString
         };
         codegenResultRawTemplatesArray[index] = {
           title: `${codegenResult.title}: Template (${nodeType})`,
           language: "PLAINTEXT",
-          code: codegenResult.code,
+          code: codegenResult.code
         };
         return;
       }
@@ -273,16 +234,10 @@ ${indent}`
     await Promise.all(resultPromises);
     return {
       codegenResultRawTemplatesArray,
-      codegenResultArray,
+      codegenResultArray
     };
   }
-  async function findChildrenSnippets(
-    codegenResult,
-    nodeChildren,
-    indent,
-    recursionIndex,
-    globalTemplates
-  ) {
+  async function findChildrenSnippets(codegenResult, nodeChildren, indent, recursionIndex, globalTemplates) {
     const string = [];
     const childPromises = nodeChildren.map(async (child) => {
       const paramsMap = await paramsFromNode(child);
@@ -294,15 +249,11 @@ ${indent}`
         recursionIndex + 1,
         codegenResult
       );
-      const snippet = snippets
-        .map((s) =>
-          s.codegenResultArray.find(
-            (r) =>
-              r.title === codegenResult.title &&
-              r.language === codegenResult.language
-          )
+      const snippet = snippets.map(
+        (s) => s.codegenResultArray.find(
+          (r) => r.title === codegenResult.title && r.language === codegenResult.language
         )
-        .find(Boolean);
+      ).find(Boolean);
       if (snippet) {
         string.push(snippet.code);
       }
@@ -318,8 +269,9 @@ ${indent}`
     }
     let valid = true;
     matches.forEach((match) => {
-      const [_, polarity, statements, matchSingle, matchOr, matchAnd] =
-        match.map((a) => (a ? a.trim() : a));
+      const [_, polarity, statements, matchSingle, matchOr, matchAnd] = match.map(
+        (a) => a ? a.trim() : a
+      );
       const isNegative = polarity === "!";
       const isPositive = polarity === "?";
       const isSingle = Boolean(matchSingle);
@@ -353,8 +305,7 @@ ${indent}`
 
   // src/params.ts
   async function paramsFromNode(node, propertiesOnly = false) {
-    const { componentPropValuesMap, instanceParamsMap } =
-      await componentPropertyDataFromNode(node);
+    const { componentPropValuesMap, instanceParamsMap } = await componentPropertyDataFromNode(node);
     const params = {};
     const paramsRaw = {};
     for (let key in componentPropValuesMap) {
@@ -373,8 +324,7 @@ ${indent}`
         paramsRaw[`property.${key}`] = value;
       }
       if (itemKeys.includes("INSTANCE_SWAP") && instanceParamsMap[key]) {
-        const keyPrefix =
-          itemKeys.length > 1 ? `property.${key}.i` : `property.${key}`;
+        const keyPrefix = itemKeys.length > 1 ? `property.${key}.i` : `property.${key}`;
         for (let k in instanceParamsMap[key].params) {
           params[`${keyPrefix}.${k}`] = safeString(
             instanceParamsMap[key].params[k]
@@ -389,28 +339,25 @@ ${indent}`
     const initial = await initialParamsFromNode(node);
     return {
       params: Object.assign(params, initial.params),
-      paramsRaw: Object.assign(paramsRaw, initial.paramsRaw),
+      paramsRaw: Object.assign(paramsRaw, initial.paramsRaw)
     };
   }
   async function componentPropertyDataFromNode(node) {
     const componentPropObject = componentPropObjectFromNode(node);
     const componentPropValuesMap = {};
-    const isDefinitions =
-      isComponentPropertyDefinitionsObject(componentPropObject);
+    const isDefinitions = isComponentPropertyDefinitionsObject(componentPropObject);
     const instanceParamsMap = {};
     for (let propertyName in componentPropObject) {
-      const value = isDefinitions
-        ? componentPropObject[propertyName].defaultValue
-        : componentPropObject[propertyName].value;
+      const value = isDefinitions ? componentPropObject[propertyName].defaultValue : componentPropObject[propertyName].value;
       const type = componentPropObject[propertyName].type;
       const cleanName = sanitizePropertyName(propertyName);
       if (value !== void 0) {
-        componentPropValuesMap[cleanName] =
-          componentPropValuesMap[cleanName] || {};
+        componentPropValuesMap[cleanName] = componentPropValuesMap[cleanName] || {};
         if (typeof value === "string") {
           if (type === "VARIANT")
             componentPropValuesMap[cleanName].VARIANT = value;
-          if (type === "TEXT") componentPropValuesMap[cleanName].TEXT = value;
+          if (type === "TEXT")
+            componentPropValuesMap[cleanName].TEXT = value;
           if (type === "INSTANCE_SWAP") {
             const foundNode = await figma.getNodeById(value);
             const nodeName = nameFromFoundInstanceSwapNode(foundNode);
@@ -430,24 +377,19 @@ ${indent}`
     return { componentPropValuesMap, instanceParamsMap };
   }
   function nameFromFoundInstanceSwapNode(node) {
-    return node && node.parent && node.parent.type === "COMPONENT_SET"
-      ? node.parent.name
-      : node
-      ? node.name
-      : "";
+    return node && node.parent && node.parent.type === "COMPONENT_SET" ? node.parent.name : node ? node.name : "";
   }
   async function initialParamsFromNode(node) {
     const componentNode = getComponentNodeFromNode(node);
     const css = await node.getCSSAsync();
-    const autolayout =
-      "inferredAutoLayout" in node ? node.inferredAutoLayout : void 0;
+    const autolayout = "inferredAutoLayout" in node ? node.inferredAutoLayout : void 0;
     const paramsRaw = {
       "node.name": node.name,
-      "node.type": node.type,
+      "node.type": node.type
     };
     const params = {
       "node.name": safeString(node.name),
-      "node.type": safeString(node.type),
+      "node.type": safeString(node.type)
     };
     if ("key" in node) {
       paramsRaw["node.key"] = node.key;
@@ -525,7 +467,7 @@ ${indent}`
         "itemSpacing",
         "counterAxisSpacing",
         "primaryAxisAlignItems",
-        "counterAxisAlignItems",
+        "counterAxisAlignItems"
       ];
       props.forEach((p) => {
         const val = autolayout[p] + "";
@@ -538,14 +480,13 @@ ${indent}`
     return { params, paramsRaw };
   }
   function isComponentPropertyDefinitionsObject(object) {
-    return (
-      object[Object.keys(object)[0]] &&
-      "defaultValue" in object[Object.keys(object)[0]]
-    );
+    return object[Object.keys(object)[0]] && "defaultValue" in object[Object.keys(object)[0]];
   }
   function componentPropObjectFromNode(node) {
-    if (node.type === "INSTANCE") return node.componentProperties;
-    if (node.type === "COMPONENT_SET") return node.componentPropertyDefinitions;
+    if (node.type === "INSTANCE")
+      return node.componentProperties;
+    if (node.type === "COMPONENT_SET")
+      return node.componentPropertyDefinitions;
     if (node.type === "COMPONENT") {
       if (node.parent && node.parent.type === "COMPONENT_SET") {
         const initialProps = Object.assign(
@@ -578,10 +519,7 @@ ${indent}`
   }
   function capitalizedNameFromName(name = "") {
     name = numericGuard(name);
-    return name
-      .split(/[^a-zA-Z\d]+/g)
-      .map(capitalize)
-      .join("");
+    return name.split(/[^a-zA-Z\d]+/g).map(capitalize).join("");
   }
   function sanitizePropertyName(name) {
     name = name.replace(/#[^#]+$/g, "");
@@ -591,21 +529,13 @@ ${indent}`
     const { type, parent } = node;
     const parentType = parent ? parent.type : "";
     const isVariant = parentType === "COMPONENT_SET";
-    if (type === "COMPONENT_SET" || (type === "COMPONENT" && !isVariant)) {
+    if (type === "COMPONENT_SET" || type === "COMPONENT" && !isVariant) {
       return node;
-    } else if (
-      node.type === "COMPONENT" &&
-      node.parent &&
-      node.parent.type === "COMPONENT_SET"
-    ) {
+    } else if (node.type === "COMPONENT" && node.parent && node.parent.type === "COMPONENT_SET") {
       return node.parent;
     } else if (type === "INSTANCE") {
       const { mainComponent } = node;
-      return mainComponent
-        ? mainComponent.parent && mainComponent.parent.type === "COMPONENT_SET"
-          ? mainComponent.parent
-          : mainComponent
-        : null;
+      return mainComponent ? mainComponent.parent && mainComponent.parent.type === "COMPONENT_SET" ? mainComponent.parent : mainComponent : null;
     }
     return null;
   }
@@ -614,14 +544,7 @@ ${indent}`
     if (!string.match(/^[A-Z0-9_]+$/)) {
       string = string.replace(/([A-Z])/g, " $1");
     }
-    return string
-      .replace(/([a-z])([0-9])/g, "$1 $2")
-      .replace(/([-_/])/g, " ")
-      .replace(/  +/g, " ")
-      .trim()
-      .toLowerCase()
-      .split(" ")
-      .join("-");
+    return string.replace(/([a-z])([0-9])/g, "$1 $2").replace(/([-_/])/g, " ").replace(/  +/g, " ").trim().toLowerCase().split(" ").join("-");
   }
 
   // src/bulk.ts
@@ -629,7 +552,7 @@ ${indent}`
     performImport,
     performExport,
     performGetComponentData,
-    performGetNodeData,
+    performGetNodeData
   };
   function performImport(data) {
     const componentsByKey = getComponentsInFileByKey();
@@ -654,8 +577,8 @@ ${indent}`
       }
     });
     const message = {
-      type: "EXPORT",
-      code: JSON.stringify(data, null, 2),
+      type: "BULK_EXPORT",
+      code: JSON.stringify(data, null, 2)
     };
     figma.ui.postMessage(message);
   }
@@ -676,14 +599,14 @@ ${indent}`
         into[component.key] = {
           name: component.name,
           description: component.description,
-          lineage: lineage.join("/"),
+          lineage: lineage.join("/")
         };
       }
       return into;
     }, componentData);
     const message = {
-      type: "COMPONENT_DATA",
-      code: JSON.stringify(data, null, 2),
+      type: "BULK_COMPONENT_DATA",
+      code: JSON.stringify(data, null, 2)
     };
     figma.ui.postMessage(message);
   }
@@ -697,8 +620,8 @@ ${indent}`
       })
     );
     const message = {
-      type: "NODE_DATA",
-      code: JSON.stringify(data, null, 2),
+      type: "BULK_NODE_DATA",
+      code: JSON.stringify(data, null, 2)
     };
     figma.ui.postMessage(message);
   }
@@ -707,64 +630,44 @@ ${indent}`
   }
   function findComponentNodesInFile() {
     if (figma.currentPage.parent) {
-      return (
-        figma.currentPage.parent.findAllWithCriteria({
-          types: ["COMPONENT", "COMPONENT_SET"],
-        }) || []
-      );
+      return figma.currentPage.parent.findAllWithCriteria({
+        types: ["COMPONENT", "COMPONENT_SET"]
+      }) || [];
     }
     return [];
   }
   function getComponentsInFileByKey() {
     const components = findComponentNodesInFile();
     const data = {};
-    components.forEach((component) => (data[component.key] = component));
+    components.forEach((component) => data[component.key] = component);
     return data;
   }
 
   // src/templates.ts
-  var templates = {
-    components: {},
-    types: {
-      FRAME: [
-        {
-          title: "React",
-          language: "JAVASCRIPT",
-          code: `<Grid 
-  direction="{{autolayout.layoutMode}}"
-  padding={{ 
-    {{?variables.paddingTop}}top: theme.{{variables.paddingTop|camel}},
-    {{!variables.paddingTop}}top: {{autolayout.paddingTop}},
-    {{?variables.paddingRight}}right: theme.{{variables.paddingRight|camel}},
-    {{!variables.paddingRight}}right: {{autolayout.paddingRight}},
-    {{?variables.paddingBottom}}bottom: theme.{{variables.paddingBottom|camel}},
-    {{!variables.paddingBottom}}bottom: {{autolayout.paddingBottom}},
-    {{?variables.paddingLeft}}left: theme.{{variables.paddingLeft|camel}},
-    {{!variables.paddingLeft}}left: {{autolayout.paddingLeft}},
-  }}
-  {{?variables.itemSpacing}}gap={theme.{{variables.itemSpacing|camel}}}
-  {{!variables.itemSpacing}}gap={{{autolayout.itemSpacing}}}
-  {{?autolayout.layoutMode=horizontal}}verticalAlign="{{autolayout.counterAxisAlignItems}}"
-  {{!autolayout.layoutMode=horizontal}}verticalAlign="{{autolayout.primaryAxisAlignItems}}"
-  {{?autolayout.layoutMode=horizontal}}horizontalAlign="{{autolayout.primaryAxisAlignItems}}"
-  {{!autolayout.layoutMode=horizontal}}horizontalAlign="{{autolayout.counterAxisAlignItems}}"
->
-  {{figma.children}}
-</Grid>`,
-        },
-      ],
-      TEXT: [
-        {
-          title: "React",
-          language: "JAVASCRIPT",
-          code: `<Typography\\
-variant="{{node.textStyle}}"\\
-{{!node.textStyle}}variant="unknown"\\
-\\>{{node.characters|raw}}</Typography>`,
-        },
-      ],
-    },
-  };
+  var CLIENT_STORAGE_GLOBAL_TEMPLATES_KEY = "global-templates";
+  function templatesIsCodeSnippetGlobalTemplates(templates) {
+    if (typeof templates === "object" && !Array.isArray(templates)) {
+      const keys = Object.keys(templates);
+      if (keys.find((k) => k !== "components" && k !== "types")) {
+        return false;
+      }
+      return true;
+    }
+    return false;
+  }
+  async function getGlobalTemplatesFromClientStorage() {
+    const templates = await figma.clientStorage.getAsync(
+      CLIENT_STORAGE_GLOBAL_TEMPLATES_KEY
+    );
+    return templates && templatesIsCodeSnippetGlobalTemplates(templates) ? templates : null;
+  }
+  async function setGlobalTemplatesInClientStorage(templates) {
+    await figma.clientStorage.setAsync(
+      CLIENT_STORAGE_GLOBAL_TEMPLATES_KEY,
+      templates
+    );
+    return;
+  }
 
   // src/code.ts
   if (figma.mode === "codegen") {
@@ -776,35 +679,41 @@ variant="{{node.textStyle}}"\\
     figma.codegen.on("preferenceschange", async (event) => {
       if (event.propertyName === "editor") {
         openCodeSnippetEditorUI();
+      } else if (event.propertyName === "templates") {
+        openTemplateUI();
       }
     });
-    figma.ui.on("message", async (event) => {
-      if (event.type === "INITIALIZE") {
-        handleCurrentSelection();
-      } else if (event.type === "SAVE") {
-        setCodegenResultsInPluginData(
-          figma.currentPage.selection[0],
-          event.data
-        );
-      } else {
-        console.log("UNKNOWN EVENT", event);
+    figma.ui.on(
+      "message",
+      async (event) => {
+        if (event.type === "EDITOR_INITIALIZE") {
+          handleCurrentSelection();
+        } else if (event.type === "EDITOR_SAVE") {
+          setCodegenResultsInPluginData(
+            figma.currentPage.selection[0],
+            event.data
+          );
+        } else if (event.type === "TEMPLATES_DATA") {
+          setGlobalTemplatesInClientStorage(event.data);
+        } else {
+          console.log("UNKNOWN EVENT", event);
+        }
       }
-    });
+    );
     figma.on("selectionchange", () => handleCurrentSelection);
     figma.codegen.on("generate", async () => {
       try {
-        const { detailsMode, defaultSnippet } =
-          figma.codegen.preferences.customSettings;
+        const { detailsMode, defaultSnippet } = figma.codegen.preferences.customSettings;
         const isDetailsMode = detailsMode === "on";
         const hasDefaultMessage = defaultSnippet === "message";
         const currentNode = handleCurrentSelection();
         const paramsMap = await paramsFromNode(currentNode);
-        const nodeSnippetTemplateDataArray =
-          await nodeSnippetTemplateDataArrayFromNode(
-            currentNode,
-            paramsMap,
-            templates
-          );
+        const templates = await getGlobalTemplatesFromClientStorage() || {};
+        const nodeSnippetTemplateDataArray = await nodeSnippetTemplateDataArrayFromNode(
+          currentNode,
+          paramsMap,
+          templates
+        );
         const snippets = codegenResultsFromNodeSnippetTemplateDataArray(
           nodeSnippetTemplateDataArray,
           isDetailsMode
@@ -813,19 +722,19 @@ variant="{{node.textStyle}}"\\
           snippets.push({
             title: "Node Params",
             code: JSON.stringify(paramsMap.params, null, 2),
-            language: "JSON",
+            language: "JSON"
           });
           snippets.push({
             title: "Node Params (Raw)",
             code: JSON.stringify(paramsMap.paramsRaw, null, 2),
-            language: "JSON",
+            language: "JSON"
           });
         }
         if (!snippets.length && hasDefaultMessage) {
           snippets.push({
             title: "Snippets",
             code: "No snippets on this node. Add snippets via the Snippet Editor.",
-            language: "PLAINTEXT",
+            language: "PLAINTEXT"
           });
         }
         return snippets;
@@ -834,30 +743,30 @@ variant="{{node.textStyle}}"\\
           {
             language: "PLAINTEXT",
             code: typeof e === "string" ? e : `${e}`,
-            title: "Error",
-          },
+            title: "Error"
+          }
         ];
       }
     });
   }
   function initializeDesignMode() {
     figma.ui.on("message", async (event) => {
-      if (event.type === "INITIALIZE") {
+      if (event.type === "BULK_INITIALIZE") {
         handleCurrentSelection();
-      } else if (event.type === "COMPONENT_DATA") {
+      } else if (event.type === "BULK_COMPONENT_DATA") {
         bulk.performGetComponentData();
-      } else if (event.type === "NODE_DATA") {
+      } else if (event.type === "BULK_NODE_DATA") {
         await bulk.performGetNodeData();
-      } else if (event.type === "EXPORT") {
+      } else if (event.type === "BULK_EXPORT") {
         bulk.performExport();
-      } else if (event.type === "IMPORT") {
+      } else if (event.type === "BULK_IMPORT") {
         bulk.performImport(event.data);
       }
     });
     figma.showUI(__uiFiles__.bulk, {
       width: 600,
       height: 600,
-      themeColors: true,
+      themeColors: true
     });
   }
   function openCodeSnippetEditorUI() {
@@ -873,17 +782,23 @@ variant="{{node.textStyle}}"\\
       position: { x: realX, y },
       width: finalWidth,
       height: finalHeight,
-      themeColors: true,
+      themeColors: true
     });
   }
-  function codegenResultsFromNodeSnippetTemplateDataArray(
-    nodeSnippetTemplateDataArray,
-    isDetailsMode
-  ) {
+  async function openTemplateUI() {
+    figma.showUI(__uiFiles__.templates, {
+      width: 600,
+      height: 600,
+      themeColors: true
+    });
+    const templates = await getGlobalTemplatesFromClientStorage() || "{}";
+    const message = { type: "TEMPLATES_INITIALIZE", templates };
+    figma.ui.postMessage(message);
+  }
+  function codegenResultsFromNodeSnippetTemplateDataArray(nodeSnippetTemplateDataArray, isDetailsMode) {
     const codegenResult = [];
     nodeSnippetTemplateDataArray.forEach((nodeSnippetTemplateData) => {
-      const { codegenResultArray, codegenResultRawTemplatesArray } =
-        nodeSnippetTemplateData;
+      const { codegenResultArray, codegenResultRawTemplatesArray } = nodeSnippetTemplateData;
       if (isDetailsMode) {
         codegenResultArray.forEach((result, i) => {
           codegenResult.push(codegenResultRawTemplatesArray[i]);
@@ -898,16 +813,14 @@ variant="{{node.textStyle}}"\\
   function handleCurrentSelection() {
     const node = figma.currentPage.selection[0];
     try {
-      const nodePluginData = node
-        ? getCodegenResultsFromPluginData(node)
-        : null;
+      const nodePluginData = node ? getCodegenResultsFromPluginData(node) : null;
       const nodeId = node ? node.id : null;
       const nodeType = node ? node.type : null;
       const message = {
-        type: "SELECTION",
+        type: "EDITOR_SELECTION",
         nodeId,
         nodeType,
-        nodePluginData,
+        nodePluginData
       };
       figma.ui.postMessage(message);
       return node;

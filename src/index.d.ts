@@ -92,21 +92,37 @@ type ComponentsByComponentKey = {
  */
 type EventFromEditor =
   | {
-      type: "INITIALIZE";
+      type: "EDITOR_INITIALIZE";
     }
   | EventFromEditorSave;
 type EventFromEditorSave = {
-  type: "SAVE";
+  type: "EDITOR_SAVE";
   data: CodegenResult[];
 };
 /**
  * Events sending to the editor.html ui
  */
 type EventToEditor = {
-  type: "SELECTION";
+  type: "EDITOR_SELECTION";
   nodeId: string | null;
   nodeType: SceneNode["type"] | null;
   nodePluginData: CodegenResult[] | null;
+};
+
+/**
+ * Events coming in from the templates.html ui
+ */
+type EventFromTemplates = EventFromTemplatesData;
+type EventFromTemplatesData = {
+  type: "TEMPLATES_DATA";
+  data: CodeSnippetGlobalTemplates;
+};
+/**
+ * Events sending to the tempaltes.html ui
+ */
+type EventToTemplates = {
+  type: "TEMPLATES_INITIALIZE";
+  templates: CodeSnippetGlobalTemplates | "{}";
 };
 
 /**
@@ -114,12 +130,16 @@ type EventToEditor = {
  */
 type EventFromBulk =
   | {
-      type: "INITIALIZE" | "COMPONENT_DATA" | "NODE_DATA" | "EXPORT";
+      type:
+        | "BULK_INITIALIZE"
+        | "BULK_COMPONENT_DATA"
+        | "BULK_NODE_DATA"
+        | "BULK_EXPORT";
     }
   | EventFromBulkImport;
 
 type EventFromBulkImport = {
-  type: "IMPORT";
+  type: "BULK_IMPORT";
   data: CodegenResultTemplatesByComponentKey;
 };
 
@@ -127,6 +147,6 @@ type EventFromBulkImport = {
  * Events sending to the bulk.html ui
  */
 type EventToBulk = {
-  type: "COMPONENT_DATA" | "NODE_DATA" | "EXPORT";
+  type: "BULK_COMPONENT_DATA" | "BULK_NODE_DATA" | "BULK_EXPORT";
   code: string;
 };

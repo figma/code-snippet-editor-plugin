@@ -71,53 +71,35 @@
     <main>
       <textarea></textarea>
       <div>
-        <button id="export">Export</button>
-        <button id="import">Import</button>
-        <button id="component-data">Component Data (File)</button>
-        <button id="node-data">Node Params (Selection)</button>
+        <button id="save">Save</button>
       </div>
     </main>
     <script>
       const textarea = document.querySelector("textarea");
       window.onmessage = (e) => {
         const data = e.data.pluginMessage;
-        if (
-          data.type === "BULK_EXPORT" ||
-          data.type === "BULK_COMPONENT_DATA" ||
-          data.type === "BULK_NODE_DATA"
-        ) {
-          textarea.value = data.code;
+        if (data.type === "TEMPLATES_INITIALIZE") {
+          textarea.value = JSON.stringify(data.templates, null, 2);
         }
       };
-      document.getElementById("export").addEventListener("click", () => {
-        parent.postMessage({ pluginMessage: { type: "BULK_EXPORT" } }, "*");
-      });
-      document
-        .getElementById("component-data")
-        .addEventListener("click", () => {
-          parent.postMessage(
-            { pluginMessage: { type: "BULK_COMPONENT_DATA" } },
-            "*"
-          );
-        });
-      document.getElementById("node-data").addEventListener("click", () => {
-        parent.postMessage({ pluginMessage: { type: "BULK_NODE_DATA" } }, "*");
-      });
-      document.getElementById("import").addEventListener("click", () => {
+      document.getElementById("save").addEventListener("click", () => {
         try {
           const data = JSON.parse(textarea.value);
-          const array = Object.keys(data);
-          const s = array.length === 1 ? "" : "s";
-          if (
-            window.confirm(
-              `This will override up to ${array.length} Component${s}. Are you sure?`
-            )
-          ) {
-            parent.postMessage(
-              { pluginMessage: { type: "BULK_IMPORT", data } },
-              "*"
-            );
+          if (typeof data === "object" && !Array.isArray(data)) {
+            const keys = Object.keys(data);
+            if (
+              keys.length &&
+              keys.find((k) => k !== "components" && k !== "types")
+            ) {
+              throw "invalid";
+            }
+          } else {
+            throw "invalid";
           }
+          parent.postMessage(
+            { pluginMessage: { type: "TEMPLATES_DATA", data } },
+            "*"
+          );
         } catch (e) {
           window.alert("Invalid JSON");
         }
