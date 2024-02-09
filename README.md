@@ -100,6 +100,8 @@ These children must have snippet templates defined on themselves with the same t
 
 Currently, `figma.children` only looks at immediate children, and will recurse up to 12 levels deep.
 
+If you want to render something when there are no children, you can also refer to the [`"node.children"`](#node) param. `{{?node.children=0}}`.
+
 Indentation for nested templates infers space or tab indents from the beginning of the line that calls `{{figma.children}}`. For example:
 
 A parent node has the template...
