@@ -656,10 +656,7 @@ ${indent}`);
         const hasDefaultMessage = defaultSnippet === "message";
         const currentNode = handleCurrentSelection();
         const paramsMap = await paramsFromNode(currentNode);
-        const nodeSnippetTemplateDataArray = await nodeSnippetTemplateDataArrayFromNode(currentNode, paramsMap, {
-          components: {},
-          types: {}
-        });
+        const nodeSnippetTemplateDataArray = await nodeSnippetTemplateDataArrayFromNode(currentNode, paramsMap, {});
         const snippets = codegenResultsFromNodeSnippetTemplateDataArray(
           nodeSnippetTemplateDataArray,
           isDetailsMode
