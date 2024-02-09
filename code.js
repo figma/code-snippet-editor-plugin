@@ -239,7 +239,7 @@ ${indent}`);
   }
   async function findChildrenSnippets(codegenResult, nodeChildren, indent, recursionIndex, globalTemplates) {
     const string = [];
-    const childPromises = nodeChildren.map(async (child) => {
+    const childPromises = nodeChildren.map(async (child, index) => {
       const paramsMap = await paramsFromNode(child);
       const snippets = await nodeSnippetTemplateDataArrayFromNode(
         child,
@@ -255,12 +255,12 @@ ${indent}`);
         )
       ).find(Boolean);
       if (snippet) {
-        string.push(snippet.code);
+        string[index] = snippet.code;
       }
       return;
     });
     await Promise.all(childPromises);
-    return string.join("\n");
+    return string.filter(Boolean).join("\n");
   }
   function lineConditionalMatch(line, params) {
     const matches = [...line.matchAll(regexConditional)];
