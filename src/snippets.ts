@@ -1,6 +1,10 @@
 import { paramsFromNode } from "./params";
 import { getCodegenResultsFromPluginData } from "./pluginData";
 
+/**
+ * The maximum depth we can recurse through children.
+ * Hitting this limit would require nesting 12 nodes deep where all have a template.
+ */
 const MAX_RECURSION = 12;
 
 /**
