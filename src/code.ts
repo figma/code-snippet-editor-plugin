@@ -66,7 +66,7 @@ function initializeCodegenMode() {
 
       const paramsMap = await paramsFromNode(currentNode);
       const nodeSnippetTemplateDataArray =
-        await nodeSnippetTemplateDataArrayFromNode(currentNode, paramsMap);
+        await nodeSnippetTemplateDataArrayFromNode(currentNode, paramsMap, {});
 
       const snippets = codegenResultsFromNodeSnippetTemplateDataArray(
         nodeSnippetTemplateDataArray,

@@ -14,6 +14,10 @@ const SNIPPET_TESTS = {
   "{{!1=1}}not1": "",
   "{{!1=2}}not1": "not1",
   "{{?1=1&2=2}}{{!hello=cheese}}compound": "compound",
+  "{{figma.children}}": "",
+  "Hello, {{figma.children}}": "",
+  "{{1}}{{hello}}{{2}}": "1world2",
+  "{{1}}{{invalid}}{{2}}": "",
 };
 
 const SNIPPET_TEST_CODE = Object.keys(SNIPPET_TESTS).join("\n");
@@ -34,7 +38,11 @@ async function testSnippets() {
   const result = await hydrateSnippets(
     [{ language: "PLAINTEXT", code: SNIPPET_TEST_CODE, title: "test" }],
     { params: SNIPPET_TEST_PARAMS, paramsRaw: SNIPPET_TEST_PARAMS },
-    "INSTANCE"
+    "INSTANCE",
+    [],
+    "",
+    0,
+    {}
   );
   const code = result.codegenResultArray[0].code;
   if (code === SNIPPET_TEST_CODE_EXPECTATION) {

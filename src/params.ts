@@ -136,6 +136,11 @@ async function initialParamsFromNode(
     paramsRaw["node.key"] = node.key;
     params["node.key"] = node.key;
   }
+  if ("children" in node) {
+    const childCount = node.children.length.toString();
+    paramsRaw["node.children"] = childCount;
+    params["node.children"] = childCount;
+  }
   if (componentNode && "key" in componentNode) {
     paramsRaw["component.key"] = componentNode.key;
     paramsRaw["component.type"] = componentNode.type;
