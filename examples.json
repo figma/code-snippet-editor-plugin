@@ -1,5 +1,4 @@
 {
-  "components": {},
   "types": {
     "FRAME": [
       {
@@ -15,5 +14,6 @@
         "code": "<Typography\\\nvariant=\"{{node.textStyle}}\"\\\n{{!node.textStyle}}variant=\"unknown\"\\\n\\>{{node.characters|raw}}</Typography>"
       }
     ]
-  }
+  },
+  "components": {}
 }
