@@ -142,10 +142,6 @@ function initializeDesignMode() {
   figma.ui.on("message", async (event: EventFromBulk) => {
     if (event.type === "BULK_INITIALIZE") {
       handleCurrentSelection();
-    } else if (event.type === "BULK_COMPONENT_DATA") {
-      bulk.performGetComponentData();
-    } else if (event.type === "BULK_NODE_DATA") {
-      await bulk.performGetNodeData();
     } else if (event.type === "BULK_EXPORT") {
       bulk.performExport();
     } else if (event.type === "BULK_IMPORT") {
