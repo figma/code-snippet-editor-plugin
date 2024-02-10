@@ -74,6 +74,54 @@
     }
   }
 
+  // src/bulk.ts
+  var bulk = {
+    performImport,
+    performExport
+  };
+  function performImport(data) {
+    const componentsByKey = getComponentsInFileByKey();
+    let componentCount = 0;
+    for (let componentKey in data) {
+      const component = componentsByKey[componentKey];
+      if (component) {
+        componentCount++;
+        setCodegenResultsInPluginData(component, data[componentKey]);
+      }
+    }
+    const s = componentCount === 1 ? "" : "s";
+    figma.notify(`Updated ${componentCount} Component${s}`);
+  }
+  function performExport() {
+    const data = {};
+    const components = findComponentNodesInFile();
+    components.forEach((component) => {
+      const codegenResults = getCodegenResultsFromPluginData(component);
+      if (codegenResults && codegenResults.length) {
+        data[component.key] = codegenResults;
+      }
+    });
+    const message = {
+      type: "BULK_EXPORT",
+      code: JSON.stringify(data, null, 2)
+    };
+    figma.ui.postMessage(message);
+  }
+  function findComponentNodesInFile() {
+    if (figma.currentPage.parent) {
+      return figma.currentPage.parent.findAllWithCriteria({
+        types: ["COMPONENT", "COMPONENT_SET"]
+      }) || [];
+    }
+    return [];
+  }
+  function getComponentsInFileByKey() {
+    const components = findComponentNodesInFile();
+    const data = {};
+    components.forEach((component) => data[component.key] = component);
+    return data;
+  }
+
   // src/snippets.ts
   var MAX_RECURSION = 12;
   var regexSymbols = /(?<!\\)\{\{([^\{\?\}\|]+)(\|([^\{\?\}]+))?\}\}/g;
@@ -547,102 +595,6 @@ ${indent}`);
     return string.replace(/([a-z])([0-9])/g, "$1 $2").replace(/([-_/])/g, " ").replace(/  +/g, " ").trim().toLowerCase().split(" ").join("-");
   }
 
-  // src/bulk.ts
-  var bulk = {
-    performImport,
-    performExport,
-    performGetComponentData,
-    performGetNodeData
-  };
-  function performImport(data) {
-    const componentsByKey = getComponentsInFileByKey();
-    let componentCount = 0;
-    for (let componentKey in data) {
-      const component = componentsByKey[componentKey];
-      if (component) {
-        componentCount++;
-        setCodegenResultsInPluginData(component, data[componentKey]);
-      }
-    }
-    const s = componentCount === 1 ? "" : "s";
-    figma.notify(`Updated ${componentCount} Component${s}`);
-  }
-  function performExport() {
-    const data = {};
-    const components = findComponentNodesInFile();
-    components.forEach((component) => {
-      const codegenResults = getCodegenResultsFromPluginData(component);
-      if (codegenResults) {
-        data[component.key] = codegenResults;
-      }
-    });
-    const message = {
-      type: "BULK_EXPORT",
-      code: JSON.stringify(data, null, 2)
-    };
-    figma.ui.postMessage(message);
-  }
-  function performGetComponentData() {
-    const components = findComponentNodesInFile();
-    const componentData = {};
-    const data = components.reduce((into, component) => {
-      if (component.parent && component.parent.type !== "COMPONENT_SET") {
-        const lineage = [];
-        let node = component.parent;
-        if (node) {
-          while (node && node.type !== "PAGE") {
-            lineage.push(node.name);
-            node = node.parent;
-          }
-        }
-        lineage.reverse();
-        into[component.key] = {
-          name: component.name,
-          description: component.description,
-          lineage: lineage.join("/")
-        };
-      }
-      return into;
-    }, componentData);
-    const message = {
-      type: "BULK_COMPONENT_DATA",
-      code: JSON.stringify(data, null, 2)
-    };
-    figma.ui.postMessage(message);
-  }
-  async function performGetNodeData() {
-    const nodes = figma.currentPage.selection;
-    const data = {};
-    await Promise.all(
-      nodes.map(async (node) => {
-        data[keyFromNode(node)] = await paramsFromNode(node);
-        return;
-      })
-    );
-    const message = {
-      type: "BULK_NODE_DATA",
-      code: JSON.stringify(data, null, 2)
-    };
-    figma.ui.postMessage(message);
-  }
-  function keyFromNode(node) {
-    return `${node.name} ${node.type} ${node.id}`;
-  }
-  function findComponentNodesInFile() {
-    if (figma.currentPage.parent) {
-      return figma.currentPage.parent.findAllWithCriteria({
-        types: ["COMPONENT", "COMPONENT_SET"]
-      }) || [];
-    }
-    return [];
-  }
-  function getComponentsInFileByKey() {
-    const components = findComponentNodesInFile();
-    const data = {};
-    components.forEach((component) => data[component.key] = component);
-    return data;
-  }
-
   // src/templates.ts
   var CLIENT_STORAGE_GLOBAL_TEMPLATES_KEY = "global-templates";
   function templatesIsCodeSnippetGlobalTemplates(templates) {
@@ -753,10 +705,6 @@ ${indent}`);
     figma.ui.on("message", async (event) => {
       if (event.type === "BULK_INITIALIZE") {
         handleCurrentSelection();
-      } else if (event.type === "BULK_COMPONENT_DATA") {
-        bulk.performGetComponentData();
-      } else if (event.type === "BULK_NODE_DATA") {
-        await bulk.performGetNodeData();
       } else if (event.type === "BULK_EXPORT") {
         bulk.performExport();
       } else if (event.type === "BULK_IMPORT") {

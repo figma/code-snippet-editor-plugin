@@ -73,35 +73,18 @@
       <div>
         <button id="export">Export</button>
         <button id="import">Import</button>
-        <button id="component-data">Component Data (File)</button>
-        <button id="node-data">Node Params (Selection)</button>
       </div>
     </main>
     <script>
       const textarea = document.querySelector("textarea");
       window.onmessage = (e) => {
         const data = e.data.pluginMessage;
-        if (
-          data.type === "BULK_EXPORT" ||
-          data.type === "BULK_COMPONENT_DATA" ||
-          data.type === "BULK_NODE_DATA"
-        ) {
+        if (data.type === "BULK_EXPORT") {
           textarea.value = data.code;
         }
       };
       document.getElementById("export").addEventListener("click", () => {
         parent.postMessage({ pluginMessage: { type: "BULK_EXPORT" } }, "*");
-      });
-      document
-        .getElementById("component-data")
-        .addEventListener("click", () => {
-          parent.postMessage(
-            { pluginMessage: { type: "BULK_COMPONENT_DATA" } },
-            "*"
-          );
-        });
-      document.getElementById("node-data").addEventListener("click", () => {
-        parent.postMessage({ pluginMessage: { type: "BULK_NODE_DATA" } }, "*");
       });
       document.getElementById("import").addEventListener("click", () => {
         try {

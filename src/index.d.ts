@@ -61,23 +61,10 @@ interface NodeSnippetTemplateData {
 }
 
 /**
- * JSON format of bulk codegen result payload for bulk import and export
- * Where key is the component key and value is an array of codegenResultTemplates
+ * JSON format of codegen result where key is the component key and value is an array of CodegenResult templates
  */
 type CodegenResultTemplatesByComponentKey = {
   [componentKey: string]: CodegenResult[];
-};
-
-/**
- * JSON format of bulk component export result payload for bulk import and export
- * Where key is the component key and value is an array of codegenResultTemplates
- */
-type ComponentDataByComponentKey = {
-  [componentKey: string]: {
-    name: string;
-    description: string;
-    lineage: string;
-  };
 };
 
 /**
@@ -130,11 +117,7 @@ type EventToTemplates = {
  */
 type EventFromBulk =
   | {
-      type:
-        | "BULK_INITIALIZE"
-        | "BULK_COMPONENT_DATA"
-        | "BULK_NODE_DATA"
-        | "BULK_EXPORT";
+      type: "BULK_INITIALIZE" | "BULK_EXPORT";
     }
   | EventFromBulkImport;
 
@@ -147,6 +130,6 @@ type EventFromBulkImport = {
  * Events sending to the bulk.html ui
  */
 type EventToBulk = {
-  type: "BULK_COMPONENT_DATA" | "BULK_NODE_DATA" | "BULK_EXPORT";
+  type: "BULK_EXPORT";
   code: string;
 };

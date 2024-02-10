@@ -25,9 +25,6 @@ Translate component variants, properties, and more into dynamic code snippets fo
 - [Global Templates](#global-templates)
 - [“Details mode”](#details-mode)
 - [Bulk Operations](#bulk-operations)
-  - [Import/Export](#importexport)
-  - [Component Data](#component-data)
-  - [Node Params](#node-params)
 - [Full Examples](#full-examples)
   - [React](#react)
   - [HTML/CSS](#htmlcss)
@@ -451,8 +448,6 @@ Details mode is really useful when you’re building or debuigging your template
 
 Running the plugin in design mode will open a window allowing you to perform bulk operations.
 
-### Import/Export
-
 You can bulk export and import templates for the current file (currently only available for components and component sets).
 
 The JSON schema for import and export is:
@@ -473,14 +468,14 @@ As an example:
 
 ```json
 {
-  "19ab8ffd23dae11c49cdecb3bd9860dc388df0de": [
+  "componentKeyABC123": [
     {
       "language": "JAVASCRIPT",
       "code": "<Button\n  {{?property.state = disabled}}disabled\n  variant=\"{{property.variant}}\"\n  {{?property.iconStart.b=true}}iconStart={<{{property.iconStart.i|pascal}} />}\n  {{?property.iconEnd.b=true}}iconEnd={<{{property.iconEnd.i|pascal}} />}\n  onClick={() => {}}\n>\n  {{property.label|raw}}\n</Button>",
       "title": "My Special Template"
     }
   ],
-  "6d607532d158046a9a6a3cc6f68a40e9cf59f006": []
+  "componentKeyDEF456": []
 }
 ```
 
@@ -489,49 +484,6 @@ When importing, if the component key is present in the current file, its templat
 Importing an empty array for a component key will remove all snippets for that component.
 
 Components whose keys are not definied in the JSON are not effected by an import, even if they have snippets defined in Figma.
-
-### Component Data
-
-The `"Component data"` action exports all component data for all non-variant components in the file as JSON.
-
-```json
-{
-  "19ab8ffd23dae11c49cdecb3bd9860dc388df0de": {
-    "name": "Button",
-    "description": "Common button used for user actions.",
-    "lineage": "Button/Button Frame"
-  },
-  "d4f127de723bbc099be23260a223af942b194606": {
-    "name": "Icon Button",
-    "description": "Common icon button used for user actions.",
-    "lineage": "Icon Button/Icon Button Frame"
-  }
-}
-```
-
-This is useful if you want to start building snippet templates in bulk, but dont know the component keys for your components.
-
-The JSON schema for component data is:
-
-```ts
-type FileData = {
-  [k: ComponentKey]: {
-    name: string;
-    description: string;
-    lineage: string;
-  };
-};
-```
-
-`name` and `description` are the name and description of the component. The lineage is a `/` separated breadcrumbs of node names to the page. This can be helpful when trying to understand which component you’re looking at.
-
-### Node Params
-
-The `"Node Data"` action returns [params](#params) for all nodes in the current selection.
-
-This output is useful if you want to analyze params for many nodes outside of the plugin interface, especially if youre building your snippet templates externally.
-
-In addition to hyphenated default `params`, it includes the `raw` params as a separate object.
 
 ## Full Examples
 

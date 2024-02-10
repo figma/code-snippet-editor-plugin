@@ -2,7 +2,6 @@ import {
   getCodegenResultsFromPluginData,
   setCodegenResultsInPluginData,
 } from "./pluginData";
-import { paramsFromNode } from "./params";
 
 /**
  * Bulk operations when run in design mode.
@@ -11,8 +10,6 @@ import { paramsFromNode } from "./params";
 export const bulk = {
   performImport,
   performExport,
-  performGetComponentData,
-  performGetNodeData,
 };
 
 /**
@@ -45,7 +42,7 @@ function performExport() {
   const components = findComponentNodesInFile();
   components.forEach((component) => {
     const codegenResults = getCodegenResultsFromPluginData(component);
-    if (codegenResults) {
+    if (codegenResults && codegenResults.length) {
       data[component.key] = codegenResults;
     }
   });
@@ -54,70 +51,6 @@ function performExport() {
     code: JSON.stringify(data, null, 2),
   };
   figma.ui.postMessage(message);
-}
-
-/**
- * Export component data, posting stringified ComponentDataByComponentKey to UI
- * https://github.com/figma/code-snippet-editor-plugin#component-data
- * @returns void
- */
-function performGetComponentData() {
-  const components = findComponentNodesInFile();
-  const componentData: ComponentDataByComponentKey = {};
-  const data = components.reduce((into, component) => {
-    if (component.parent && component.parent.type !== "COMPONENT_SET") {
-      const lineage = [];
-      let node: BaseNode | null = component.parent;
-      if (node) {
-        while (node && node.type !== "PAGE") {
-          lineage.push(node.name);
-          node = node.parent;
-        }
-      }
-      lineage.reverse();
-      into[component.key] = {
-        name: component.name,
-        description: component.description,
-        lineage: lineage.join("/"),
-      };
-    }
-    return into;
-  }, componentData);
-  const message: EventToBulk = {
-    type: "BULK_COMPONENT_DATA",
-    code: JSON.stringify(data, null, 2),
-  };
-  figma.ui.postMessage(message);
-}
-
-/**
- * Get node params for all nodes in a selection and posting data to UI
- * https://github.com/figma/code-snippet-editor-plugin#node-params
- * @returns Promise<void>
- */
-async function performGetNodeData() {
-  const nodes = figma.currentPage.selection;
-  const data: { [k: string]: CodeSnippetParamsMap } = {};
-  await Promise.all(
-    nodes.map(async (node) => {
-      data[keyFromNode(node)] = await paramsFromNode(node);
-      return;
-    })
-  );
-  const message: EventToBulk = {
-    type: "BULK_NODE_DATA",
-    code: JSON.stringify(data, null, 2),
-  };
-  figma.ui.postMessage(message);
-}
-
-/**
- * Generate a key descriptive and unique to the node for indexing node data
- * @param node node to generate a key from
- * @returns a unique key for indexing the node data
- */
-function keyFromNode(node: SceneNode) {
-  return `${node.name} ${node.type} ${node.id}`;
 }
 
 /**
