@@ -111,7 +111,9 @@ type EventToEditor = {
 /**
  * Events coming in from the templates.html ui
  */
-type EventFromTemplates = EventFromTemplatesData;
+type EventFromTemplates =
+  | { type: "TEMPLATES_LOAD" | "TEMPLATES_ATOB" | "TEMPLATES_BTOA" }
+  | EventFromTemplatesData;
 type EventFromTemplatesData = {
   type: "TEMPLATES_DATA";
   data: CodeSnippetGlobalTemplates;

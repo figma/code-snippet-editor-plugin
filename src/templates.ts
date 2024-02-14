@@ -1,4 +1,8 @@
+import { getCodegenResultsFromPluginData } from "./pluginData";
+
 const CLIENT_STORAGE_GLOBAL_TEMPLATES_KEY = "global-templates";
+const TEMPLATE_VARIABLE_COLLECTION_NAME =
+  "Code Snippet Editor Global Templates";
 
 /**
  * Type safety function to indicate if item in clientStorage is CodeSnippetGlobalTemplates or not.
@@ -16,6 +20,75 @@ function templatesIsCodeSnippetGlobalTemplates(
     return true;
   }
   return false;
+}
+
+function atob(string: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    figma.ui.on("message", (e) =>
+      e.type === "TEMPLATES_ATOB" ? resolve(e.data) : null
+    );
+    figma.showUI(
+      `<script>parent.postMessage({ pluginMessage: { type: "TEMPLATES_ATOB", data: atob("${string}") } }, "*");</script>`,
+      { visible: false }
+    );
+  });
+}
+
+function btoa(string: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    figma.ui.on("message", (e) =>
+      e.type === "TEMPLATES_BTOA" ? resolve(e.data) : null
+    );
+    figma.showUI(
+      `<script>parent.postMessage({ pluginMessage: { type: "TEMPLATES_BTOA", data: btoa("${string}") } }, "*");</script>`,
+      { visible: false }
+    );
+  });
+}
+
+export async function getGlobalTemplates(): Promise<CodeSnippetGlobalTemplates | null> {
+  const templates = (await getGlobalTemplatesFromClientStorage()) || {};
+  // const collectionsFromTeamLibraries =
+  //   await figma.teamLibrary.getAvailableLibraryVariableCollectionsAsync();
+  // const collection = collectionsFromTeamLibraries.find(
+  //   (collection) => collection.name === TEMPLATE_VARIABLE_COLLECTION_NAME
+  // );
+  // if (collection) {
+  //   const libraryVariables =
+  //     await figma.teamLibrary.getVariablesInLibraryCollectionAsync(
+  //       collection.key
+  //     );
+  //   const variableTemplates = await atob(libraryVariables[0].name);
+  //   if (variableTemplates) {
+  //     const json = JSON.parse(variableTemplates);
+  //     templates.types = json.types;
+  //   }
+  // }
+  return templates;
+}
+
+/**
+ * Finding global templates stored on the current page
+ * https://www.figma.com/plugin-docs/api/figma-clientStorage
+ * @returns Promise resolving CodeSnippetGlobalTemplates object or null
+ */
+export async function loadTemplatesFromPage(): Promise<CodeSnippetGlobalTemplates | null> {
+  const templates = (await getGlobalTemplatesFromClientStorage()) || {};
+  templates.types = {};
+  figma.currentPage.children.forEach((node) => {
+    const result = getCodegenResultsFromPluginData(node);
+    if (templates.types && result.length) {
+      templates.types[node.name as NodeType] = result;
+    }
+  });
+  if (
+    Object.keys(templates.components || {}).length ||
+    Object.keys(templates.types).length
+  ) {
+    return templates;
+  } else {
+    return null;
+  }
 }
 
 /**

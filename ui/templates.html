@@ -72,6 +72,7 @@
       <textarea></textarea>
       <div>
         <button id="save">Save</button>
+        <button id="load">Load from page</button>
       </div>
     </main>
     <script>
@@ -82,6 +83,9 @@
           textarea.value = JSON.stringify(data.templates, null, 2);
         }
       };
+      document.getElementById("load").addEventListener("click", () => {
+        parent.postMessage({ pluginMessage: { type: "TEMPLATES_LOAD" } }, "*");
+      });
       document.getElementById("save").addEventListener("click", () => {
         try {
           const data = JSON.parse(textarea.value);

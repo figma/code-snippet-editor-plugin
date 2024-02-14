@@ -736,6 +736,21 @@ ${indent}`);
     }
     return false;
   }
+  async function loadTemplatesFromPage() {
+    const templates = await getGlobalTemplatesFromClientStorage() || {};
+    templates.types = {};
+    figma.currentPage.children.forEach((node) => {
+      const result = getCodegenResultsFromPluginData(node);
+      if (templates.types && result.length) {
+        templates.types[node.name] = result;
+      }
+    });
+    if (Object.keys(templates.components || {}).length || Object.keys(templates.types).length) {
+      return templates;
+    } else {
+      return null;
+    }
+  }
   async function getGlobalTemplatesFromClientStorage() {
     const templates = await figma.clientStorage.getAsync(
       CLIENT_STORAGE_GLOBAL_TEMPLATES_KEY
@@ -756,7 +771,7 @@ ${indent}`);
   } else {
     initializeDesignMode();
   }
-  function initializeCodegenMode() {
+  async function initializeCodegenMode() {
     figma.codegen.on("preferenceschange", async (event) => {
       if (event.propertyName === "editor") {
         openCodeSnippetEditorUI();
@@ -776,6 +791,19 @@ ${indent}`);
           );
         } else if (event.type === "TEMPLATES_DATA") {
           setGlobalTemplatesInClientStorage(event.data);
+          figma.notify("Saved!");
+        } else if (event.type === "TEMPLATES_LOAD") {
+          const templates = await loadTemplatesFromPage();
+          if (templates) {
+            const message = {
+              type: "TEMPLATES_INITIALIZE",
+              templates
+            };
+            figma.ui.postMessage(message);
+          } else {
+            figma.notify("No templates defined on this page");
+          }
+        } else if (event.type === "TEMPLATES_ATOB" || event.type === "TEMPLATES_BTOA") {
         } else {
           console.log("UNKNOWN EVENT", event);
         }
@@ -818,6 +846,7 @@ ${indent}`);
         }
         return snippets;
       } catch (e) {
+        console.error(e);
         return [
           {
             language: "PLAINTEXT",

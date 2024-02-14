@@ -4,7 +4,7 @@
   "api": "1.0.0",
   "editorType": ["dev", "figma"],
   "capabilities": ["codegen", "vscode"],
-  "permissions": [],
+  "permissions": ["teamlibrary"],
   "codegenLanguages": [{ "label": "Snippets", "value": "snippets" }],
   "codegenPreferences": [
     {

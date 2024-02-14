@@ -6,8 +6,10 @@ import {
 import { recursiveParamsFromNode } from "./params";
 import { nodeSnippetTemplateDataArrayFromNode } from "./snippets";
 import {
+  getGlobalTemplates,
   getGlobalTemplatesFromClientStorage,
   setGlobalTemplatesInClientStorage,
+  loadTemplatesFromPage,
 } from "./templates";
 
 if (figma.mode === "codegen") {
@@ -20,7 +22,7 @@ if (figma.mode === "codegen") {
  * In codegen mode (running in Dev Mode), the plugin returns codegen,
  *  and can also open a UI "editor" for managing snippet templates.
  */
-function initializeCodegenMode() {
+async function initializeCodegenMode() {
   /**
    * The preferences change event is fired when settings change from the codegen settings menu.
    * We only respond to this event when the user selects "Open Editor"
@@ -51,6 +53,23 @@ function initializeCodegenMode() {
         );
       } else if (event.type === "TEMPLATES_DATA") {
         setGlobalTemplatesInClientStorage(event.data);
+        figma.notify("Saved!");
+      } else if (event.type === "TEMPLATES_LOAD") {
+        const templates = await loadTemplatesFromPage();
+        if (templates) {
+          const message: EventToTemplates = {
+            type: "TEMPLATES_INITIALIZE",
+            templates,
+          };
+          figma.ui.postMessage(message);
+        } else {
+          figma.notify("No templates defined on this page");
+        }
+      } else if (
+        event.type === "TEMPLATES_ATOB" ||
+        event.type === "TEMPLATES_BTOA"
+      ) {
+        // nothing
       } else {
         console.log("UNKNOWN EVENT", event);
       }
@@ -121,6 +140,7 @@ function initializeCodegenMode() {
 
       return snippets;
     } catch (e: any) {
+      console.error(e);
       return [
         {
           language: "PLAINTEXT",
