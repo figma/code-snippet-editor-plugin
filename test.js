@@ -343,11 +343,19 @@
           codegenResultTemplates.push(...matchingCodegenResults);
         }
       }
-      if (globalTemplates) {
-        const componentTemplates = "key" in snippetNode && globalTemplates.components ? globalTemplates.components[snippetNode.key] || [] : [];
-        const typeTemplates = globalTemplates.types ? globalTemplates.types[snippetNode.type] || [] : [];
+      if (globalTemplates.components) {
+        const componentTemplates = "key" in snippetNode ? globalTemplates.components[snippetNode.key] || [] : [];
         codegenResultTemplates.push(...matchingTemplates(componentTemplates));
-        codegenResultTemplates.push(...matchingTemplates(typeTemplates));
+      }
+      if (!Object.keys(seenSnippetTemplates).length && !codegenResultTemplates.length && globalTemplates.types) {
+        const typeTemplates = globalTemplates.types[snippetNode.type] || [];
+        const seenKey = JSON.stringify(typeTemplates);
+        if (!seenSnippetTemplates[seenKey]) {
+          seenSnippetTemplates[seenKey] = 1;
+          const defaultTemplates = !typeTemplates.length && globalTemplates.types.DEFAULT ? globalTemplates.types.DEFAULT : [];
+          codegenResultTemplates.push(...matchingTemplates(typeTemplates));
+          codegenResultTemplates.push(...matchingTemplates(defaultTemplates));
+        }
       }
       const children = "children" in node ? node.children : [];
       const nodeSnippetTemplateData = await hydrateSnippets(
@@ -361,17 +369,17 @@
       );
       nodeSnippetTemplateDataArray.push(nodeSnippetTemplateData);
     }
-    await processSnippetTemplatesForNode(node);
-    if (node.type === "INSTANCE") {
+    if (node.type === "COMPONENT" && node.parent && node.parent.type === "COMPONENT_SET") {
+      await processSnippetTemplatesForNode(node.parent);
+    } else if (node.type === "INSTANCE") {
       if (node.mainComponent) {
-        await processSnippetTemplatesForNode(node.mainComponent);
         if (node.mainComponent.parent && node.mainComponent.parent.type === "COMPONENT_SET") {
           await processSnippetTemplatesForNode(node.mainComponent.parent);
         }
+        await processSnippetTemplatesForNode(node.mainComponent);
       }
-    } else if (node.type === "COMPONENT" && node.parent && node.parent.type === "COMPONENT_SET") {
-      await processSnippetTemplatesForNode(node.parent);
     }
+    await processSnippetTemplatesForNode(node);
     return nodeSnippetTemplateDataArray;
   }
   function transformStringWithFilter(string, rawString, filter = "hyphen") {
@@ -425,16 +433,16 @@
               } else if (param === "figma.children" && recursionIndex < MAX_RECURSION) {
                 const indentMatch = line.match(/^[ \t]+/);
                 const indent2 = indentMatch ? indentMatch[0] : "";
-                const value = await findChildrenSnippets(
+                const childrenValue = await findChildrenSnippets(
                   codegenResult,
                   nodeChildren,
                   indent2,
                   recursionIndex + 1,
                   globalTemplates
                 );
-                if (value) {
+                if (childrenValue) {
                   line = line.replace(/^[ \t]+/, "");
-                  line = line.replace(match, value);
+                  line = line.replace(match, childrenValue);
                 } else {
                   succeeded = false;
                 }
