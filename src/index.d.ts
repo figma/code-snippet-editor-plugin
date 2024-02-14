@@ -5,7 +5,7 @@
  */
 type CodeSnippetGlobalTemplates = {
   components?: CodegenResultTemplatesByComponentKey;
-  types?: { [K in NodeType]?: CodegenResult[] };
+  types?: { [K in NodeType | "DEFAULT"]?: CodegenResult[] };
 };
 
 /**
