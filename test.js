@@ -418,15 +418,6 @@
           const symbolMatches = [...line.matchAll(regexSymbols)];
           if (qualifies && symbolMatches.length) {
             let succeeded = true;
-            const indentMatch = line.match(/^[ \t]+/);
-            const indent2 = indentMatch ? indentMatch[0] : "";
-            const childrenValue = await findChildrenSnippets(
-              codegenResult,
-              nodeChildren,
-              indent2,
-              recursionIndex + 1,
-              globalTemplates
-            );
             for (let j = 0; j < symbolMatches.length; j++) {
               const symbolMatch = symbolMatches[j];
               const [match, param, _, filter] = symbolMatch.map(
@@ -440,6 +431,15 @@
                 );
                 line = line.replace(match, value);
               } else if (param === "figma.children" && recursionIndex < MAX_RECURSION) {
+                const indentMatch = line.match(/^[ \t]+/);
+                const indent2 = indentMatch ? indentMatch[0] : "";
+                const childrenValue = await findChildrenSnippets(
+                  codegenResult,
+                  nodeChildren,
+                  indent2,
+                  recursionIndex + 1,
+                  globalTemplates
+                );
                 if (childrenValue) {
                   line = line.replace(/^[ \t]+/, "");
                   line = line.replace(match, childrenValue);

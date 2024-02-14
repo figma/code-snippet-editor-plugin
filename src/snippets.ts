@@ -244,15 +244,6 @@ export async function hydrateSnippets(
         const symbolMatches = [...line.matchAll(regexSymbols)];
         if (qualifies && symbolMatches.length) {
           let succeeded = true;
-          const indentMatch = line.match(/^[ \t]+/);
-          const indent = indentMatch ? indentMatch[0] : "";
-          const childrenValue = await findChildrenSnippets(
-            codegenResult,
-            nodeChildren,
-            indent,
-            recursionIndex + 1,
-            globalTemplates
-          );
           for (let j = 0; j < symbolMatches.length; j++) {
             const symbolMatch = symbolMatches[j];
             const [match, param, _, filter] = symbolMatch.map((a) =>
@@ -269,6 +260,15 @@ export async function hydrateSnippets(
               param === "figma.children" &&
               recursionIndex < MAX_RECURSION
             ) {
+              const indentMatch = line.match(/^[ \t]+/);
+              const indent = indentMatch ? indentMatch[0] : "";
+              const childrenValue = await findChildrenSnippets(
+                codegenResult,
+                nodeChildren,
+                indent,
+                recursionIndex + 1,
+                globalTemplates
+              );
               if (childrenValue) {
                 line = line.replace(/^[ \t]+/, "");
                 line = line.replace(match, childrenValue);
