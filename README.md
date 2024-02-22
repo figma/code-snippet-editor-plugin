@@ -390,7 +390,7 @@ If `node.name` was "Figma is great!", the following template...
 figma-is-great
 Figma is great!
 FigmaIsGreat
-figmaIsGreat
+figma_is_great
 figma-is-great
 FIGMA_IS_GREAT
 ```
