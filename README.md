@@ -391,6 +391,7 @@ figma-is-great
 Figma is great!
 FigmaIsGreat
 figmaIsGreat
+figma_is_great
 figma-is-great
 FIGMA_IS_GREAT
 ```
