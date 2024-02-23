@@ -169,7 +169,7 @@
           codegenResultTemplates.push(...matchingTemplates(defaultTemplates));
         }
       }
-      const children = "children" in node ? node.children : [];
+      const children = "children" in node ? node.children.filter((n) => n.visible) : [];
       const nodeSnippetTemplateData = await hydrateSnippets(
         codegenResultTemplates,
         codeSnippetParamsMap,
