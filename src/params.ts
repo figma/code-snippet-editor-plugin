@@ -1,4 +1,8 @@
-import { transformStringWithFilter } from "./snippets";
+import { getCodegenResultsFromPluginData } from "./pluginData";
+import {
+  snippetTemplatesWithInheritanceNode,
+  transformStringWithFilter,
+} from "./snippets";
 
 /**
  * Return the code snippet params for a node.
@@ -8,7 +12,7 @@ import { transformStringWithFilter } from "./snippets";
  *  (only true when getting instance swap child properties)
  * @returns Promise that resolves a CodeSnippetParamsMap
  */
-export async function paramsFromNode(
+async function paramsFromNode(
   node: BaseNode,
   propertiesOnly = false
 ): Promise<CodeSnippetParamsMap> {
@@ -44,13 +48,98 @@ export async function paramsFromNode(
   }
 
   if (propertiesOnly) {
-    return { params, paramsRaw };
+    return { params, paramsRaw, template: {} };
   }
 
   const initial = await initialParamsFromNode(node);
   return {
     params: Object.assign(params, initial.params),
     paramsRaw: Object.assign(paramsRaw, initial.paramsRaw),
+    template: {},
+  };
+}
+
+/**
+ * Generating a snippet template id string from a CodegenResult
+ * @param codegenResult
+ * @returns a string to identify the snippet
+ */
+export function snippetIdFromCodegenResult(codegenResult: CodegenResult) {
+  return `${codegenResult.title}-${codegenResult.language}`;
+}
+
+/**
+ * Return the code snippet params for a node.
+ * https://github.com/figma/code-snippet-editor-plugin#params
+ * @param node the node we want params for
+ * @returns Promise that resolves a CodeSnippetParamsMap
+ */
+export async function recursiveParamsFromNode(
+  node: BaseNode,
+  globalTemplates: CodeSnippetGlobalTemplates,
+  specificSnippetId?: string
+): Promise<CodeSnippetParamsMap> {
+  const children =
+    "children" in node
+      ? node.children.filter((n) => ("visible" in n ? n.visible : true))
+      : [];
+  const childrenTemplatesObject: {
+    [snippetId: string]: BaseNode[];
+  } = {};
+  for (let child of children) {
+    const templatesArray = await snippetTemplatesWithInheritanceNode(
+      child,
+      globalTemplates
+    );
+    const templates = templatesArray.flatMap((result) => result[1]);
+    templates.forEach((template) => {
+      const snippetId = snippetIdFromCodegenResult(template);
+      if (!specificSnippetId || snippetId === specificSnippetId) {
+        childrenTemplatesObject[snippetId] =
+          childrenTemplatesObject[snippetId] || [];
+        childrenTemplatesObject[snippetId].push(child);
+      }
+    });
+  }
+  const nodeTemplatesArray = await snippetTemplatesWithInheritanceNode(
+    node,
+    globalTemplates
+  );
+  const nodeTemplates = nodeTemplatesArray.flatMap((result) => result[1]);
+  const nodeTemplatesObject: {
+    [snippetId: string]: CodeSnippetParamsTemplateParams;
+  } = {};
+  for (let template of nodeTemplates) {
+    const snippetId = snippetIdFromCodegenResult(template);
+    if (!specificSnippetId || snippetId === specificSnippetId) {
+      nodeTemplatesObject[snippetId] = nodeTemplatesObject[snippetId] || {
+        code: template.code,
+      };
+      if (template.code.match(/\{\{ *figma.children *\}\}/)) {
+        if (childrenTemplatesObject[snippetId]) {
+          nodeTemplatesObject[snippetId].children = await Promise.all(
+            childrenTemplatesObject[snippetId].map(
+              async (child) =>
+                await recursiveParamsFromNode(child, globalTemplates, snippetId)
+            )
+          );
+        }
+      }
+      if (
+        template.code.match(/\{\{ *figma.svg *\}\}/) &&
+        "exportAsync" in node
+      ) {
+        nodeTemplatesObject[snippetId].svg = (
+          await node.exportAsync({ format: "SVG" })
+        ).toString();
+      }
+    }
+  }
+  const { params, paramsRaw } = await paramsFromNode(node);
+  return {
+    params,
+    paramsRaw,
+    template: nodeTemplatesObject,
   };
 }
 
@@ -221,7 +310,7 @@ async function initialParamsFromNode(
       }
     });
   }
-  return { params, paramsRaw };
+  return { params, paramsRaw, template: {} };
 }
 
 /**
