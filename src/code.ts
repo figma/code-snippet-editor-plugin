@@ -3,7 +3,7 @@ import {
   getCodegenResultsFromPluginData,
   setCodegenResultsInPluginData,
 } from "./pluginData";
-import { paramsFromNode } from "./params";
+import { recursiveParamsFromNode } from "./params";
 import { nodeSnippetTemplateDataArrayFromNode } from "./snippets";
 import {
   getGlobalTemplatesFromClientStorage,
@@ -78,12 +78,15 @@ function initializeCodegenMode() {
       const hasDefaultMessage = defaultSnippet === "message";
       const currentNode = handleCurrentSelection();
 
-      const paramsMap = await paramsFromNode(currentNode);
       const templates = (await getGlobalTemplatesFromClientStorage()) || {};
+      const recursiveParamsMap = await recursiveParamsFromNode(
+        currentNode,
+        templates
+      );
       const nodeSnippetTemplateDataArray =
         await nodeSnippetTemplateDataArrayFromNode(
           currentNode,
-          paramsMap,
+          recursiveParamsMap,
           templates
         );
 
@@ -98,13 +101,8 @@ function initializeCodegenMode() {
        */
       if (isDetailsMode) {
         snippets.push({
-          title: "Node Params",
-          code: JSON.stringify(paramsMap.params, null, 2),
-          language: "JSON",
-        });
-        snippets.push({
-          title: "Node Params (Raw)",
-          code: JSON.stringify(paramsMap.paramsRaw, null, 2),
+          title: "Params",
+          code: JSON.stringify(recursiveParamsMap, null, 2),
           language: "JSON",
         });
       }

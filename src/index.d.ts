@@ -14,11 +14,23 @@ type CodeSnippetGlobalTemplates = {
 type CodeSnippetParams = { [k: string]: string };
 
 /**
+ * An object of template specific params, only generated when template calls for it.
+ */
+type CodeSnippetParamsTemplateParams = {
+  code: string;
+  children?: CodeSnippetParamsMap[];
+  svg?: string;
+};
+
+/**
  * A map of raw and normalized code snippet params objects. Keys are implicitly the same, values are formatted differently.
  */
 type CodeSnippetParamsMap = {
   paramsRaw: CodeSnippetParams;
   params: CodeSnippetParams;
+  template: {
+    [templateId: string]: CodeSnippetParamsTemplateParams;
+  };
 };
 
 /**

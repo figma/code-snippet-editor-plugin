@@ -1,4 +1,4 @@
-import { paramsFromNode } from "./params";
+import { snippetIdFromCodegenResult } from "./params";
 import { getCodegenResultsFromPluginData } from "./pluginData";
 
 /**
@@ -69,7 +69,7 @@ const regexConditional = new RegExp(
  * @returns NodeSnippetTemplateData array containing hydrated snippets for the current node.
  */
 export async function nodeSnippetTemplateDataArrayFromNode(
-  node: SceneNode,
+  node: BaseNode,
   codeSnippetParamsMap: CodeSnippetParamsMap,
   globalTemplates: CodeSnippetGlobalTemplates,
   indent: string = "",
@@ -77,65 +77,22 @@ export async function nodeSnippetTemplateDataArrayFromNode(
   parentCodegenResult?: CodegenResult
 ): Promise<NodeSnippetTemplateData[]> {
   const nodeSnippetTemplateDataArray: NodeSnippetTemplateData[] = [];
-  const seenSnippetTemplates: { [k: string]: number } = {};
 
-  /**
-   * Process snippets for any node. Called multiple times up the lineage for component and instance nodes.
-   * Instances have the same pluginData as their mainComponent, unless they have overridden the pluginData.
-   * This tracks these duplicate cases in seenSnippetTemplates and filters them out.
-   * @param node the node to check for templates in plugin data
-   * @returns Promise<void> will push into nodeSnippetTemplateDataArray.
-   */
-  async function processSnippetTemplatesForNode(snippetNode: SceneNode) {
-    const codegenResults = getCodegenResultsFromPluginData(snippetNode);
-    const matchingTemplates = (templates: CodegenResult[]) =>
-      templates.filter(
-        ({ title, language }) =>
-          !parentCodegenResult ||
-          (title === parentCodegenResult.title &&
-            language === parentCodegenResult.language)
-      );
-    const matchingCodegenResults = matchingTemplates(codegenResults);
-    const codegenResultTemplates: CodegenResult[] = [];
-    if (matchingCodegenResults.length) {
-      const seenKey = JSON.stringify(matchingCodegenResults);
-      if (!seenSnippetTemplates[seenKey]) {
-        seenSnippetTemplates[seenKey] = 1;
-        codegenResultTemplates.push(...matchingCodegenResults);
-      }
-    }
-    if (globalTemplates.components) {
-      const componentTemplates =
-        "key" in snippetNode
-          ? globalTemplates.components[snippetNode.key] || []
-          : [];
-      codegenResultTemplates.push(...matchingTemplates(componentTemplates));
-    }
+  const templatesWithInheritanceNode =
+    await snippetTemplatesWithInheritanceNode(
+      node,
+      globalTemplates,
+      parentCodegenResult
+    );
 
-    if (
-      !Object.keys(seenSnippetTemplates).length &&
-      !codegenResultTemplates.length &&
-      globalTemplates.types
-    ) {
-      const typeTemplates = globalTemplates.types[snippetNode.type] || [];
-      const seenKey = JSON.stringify(typeTemplates);
-      if (!seenSnippetTemplates[seenKey]) {
-        seenSnippetTemplates[seenKey] = 1;
-        const defaultTemplates =
-          !typeTemplates.length && globalTemplates.types.DEFAULT
-            ? globalTemplates.types.DEFAULT
-            : [];
-        codegenResultTemplates.push(...matchingTemplates(typeTemplates));
-        codegenResultTemplates.push(...matchingTemplates(defaultTemplates));
-      }
-    }
-    const children =
-      "children" in node ? node.children.filter((n) => n.visible) : [];
+  for (let [
+    inheritanceNode,
+    snippetTemplates,
+  ] of templatesWithInheritanceNode) {
     const nodeSnippetTemplateData = await hydrateSnippets(
-      codegenResultTemplates,
+      snippetTemplates,
       codeSnippetParamsMap,
-      snippetNode.type,
-      children,
+      inheritanceNode.type,
       indent,
       recursionIndex,
       globalTemplates
@@ -143,6 +100,16 @@ export async function nodeSnippetTemplateDataArrayFromNode(
     nodeSnippetTemplateDataArray.push(nodeSnippetTemplateData);
   }
 
+  return nodeSnippetTemplateDataArray;
+}
+
+export async function snippetTemplatesWithInheritanceNode(
+  node: BaseNode,
+  globalTemplates: CodeSnippetGlobalTemplates,
+  parentCodegenResult?: CodegenResult
+) {
+  const seenSnippetTemplates: { [k: string]: number } = {};
+  const nodeAndTemplates: [BaseNode, CodegenResult[]][] = [];
   /**
    * Templates via inheritance from component lineage.
    * Starting at the top with component sets, then components, then instances.
@@ -152,25 +119,121 @@ export async function nodeSnippetTemplateDataArrayFromNode(
     node.parent &&
     node.parent.type === "COMPONENT_SET"
   ) {
-    await processSnippetTemplatesForNode(node.parent);
+    const componentSetTemplates = await snippetTemplatesForNode(
+      node.parent,
+      seenSnippetTemplates,
+      globalTemplates,
+      parentCodegenResult
+    );
+    if (componentSetTemplates.length) {
+      nodeAndTemplates.push([node.parent, componentSetTemplates]);
+    }
   } else if (node.type === "INSTANCE") {
     if (node.mainComponent) {
       if (
         node.mainComponent.parent &&
         node.mainComponent.parent.type === "COMPONENT_SET"
       ) {
-        await processSnippetTemplatesForNode(node.mainComponent.parent);
+        const componentSetTemplates = await snippetTemplatesForNode(
+          node.mainComponent.parent,
+          seenSnippetTemplates,
+          globalTemplates,
+          parentCodegenResult
+        );
+        if (componentSetTemplates.length) {
+          nodeAndTemplates.push([
+            node.mainComponent.parent,
+            componentSetTemplates,
+          ]);
+        }
       }
-      await processSnippetTemplatesForNode(node.mainComponent);
+      const mainComponentTemplates = await snippetTemplatesForNode(
+        node.mainComponent,
+        seenSnippetTemplates,
+        globalTemplates,
+        parentCodegenResult
+      );
+      if (mainComponentTemplates.length) {
+        nodeAndTemplates.push([node.mainComponent, mainComponentTemplates]);
+      }
     }
   }
 
   /**
    * Templates on the given node
    */
-  await processSnippetTemplatesForNode(node);
+  const nodeTemplates = await snippetTemplatesForNode(
+    node,
+    seenSnippetTemplates,
+    globalTemplates,
+    parentCodegenResult
+  );
+  if (nodeTemplates.length) {
+    nodeAndTemplates.push([node, nodeTemplates]);
+  }
 
-  return nodeSnippetTemplateDataArray;
+  return nodeAndTemplates;
+}
+
+/**
+ * Process snippets for any node. Called multiple times up the lineage for component and instance nodes.
+ * Instances have the same pluginData as their mainComponent, unless they have overridden the pluginData.
+ * This tracks these duplicate cases in seenSnippetTemplates and filters them out.
+ * @param snippetNode the node to check for templates in plugin data
+ * @param seenSnippetTemplates a memo of seen snippet templates, so duplicates can be ignored
+ * @param globalTemplates CodeSnippetGlobalTemplates object
+ * @param parentCodegenResult If present, template language and title must match this. Used to filter out templates up front during recursion.
+ * @returns Promise<void> will push into nodeSnippetTemplateDataArray.
+ */
+async function snippetTemplatesForNode(
+  snippetNode: BaseNode,
+  seenSnippetTemplates: { [k: string]: number },
+  globalTemplates: CodeSnippetGlobalTemplates,
+  parentCodegenResult?: CodegenResult
+) {
+  const codegenResults = getCodegenResultsFromPluginData(snippetNode);
+  const matchingTemplates = (templates: CodegenResult[]) =>
+    templates.filter(
+      ({ title, language }) =>
+        !parentCodegenResult ||
+        (title === parentCodegenResult.title &&
+          language === parentCodegenResult.language)
+    );
+  const matchingCodegenResults = matchingTemplates(codegenResults);
+  const codegenResultTemplates: CodegenResult[] = [];
+  if (matchingCodegenResults.length) {
+    const seenKey = JSON.stringify(matchingCodegenResults);
+    if (!seenSnippetTemplates[seenKey]) {
+      seenSnippetTemplates[seenKey] = 1;
+      codegenResultTemplates.push(...matchingCodegenResults);
+    }
+  }
+  if (globalTemplates.components) {
+    const componentTemplates =
+      "key" in snippetNode
+        ? globalTemplates.components[snippetNode.key] || []
+        : [];
+    codegenResultTemplates.push(...matchingTemplates(componentTemplates));
+  }
+
+  if (
+    !Object.keys(seenSnippetTemplates).length &&
+    !codegenResultTemplates.length &&
+    globalTemplates.types
+  ) {
+    const typeTemplates = globalTemplates.types[snippetNode.type] || [];
+    const seenKey = JSON.stringify(typeTemplates);
+    if (!seenSnippetTemplates[seenKey]) {
+      seenSnippetTemplates[seenKey] = 1;
+      const defaultTemplates =
+        !typeTemplates.length && globalTemplates.types.DEFAULT
+          ? globalTemplates.types.DEFAULT
+          : [];
+      codegenResultTemplates.push(...matchingTemplates(typeTemplates));
+      codegenResultTemplates.push(...matchingTemplates(defaultTemplates));
+    }
+  }
+  return codegenResultTemplates;
 }
 
 /**
@@ -212,7 +275,6 @@ export function transformStringWithFilter(
  * @param codegenResultTemplatesArray codegen result array of templates loaded from pluginData or global templates.
  * @param codeSnippetParamsMap the map of raw and sanitized params used to hydrate the template.
  * @param nodeType string for the type of node the template is coming from. used in the title in details mode.
- * @param children an array of child nodes
  * @param indent the string to use for indent on children
  * @param recursionIndex how deep are we in recursion
  * @param globalTemplates the global templates object for component key or node type based templates
@@ -222,90 +284,29 @@ export async function hydrateSnippets(
   codegenResultTemplatesArray: CodegenResult[],
   codeSnippetParamsMap: CodeSnippetParamsMap,
   nodeType: string,
-  nodeChildren: readonly SceneNode[],
   indent: string,
   recursionIndex: number,
   globalTemplates: CodeSnippetGlobalTemplates
 ): Promise<NodeSnippetTemplateData> {
-  const { paramsRaw, params } = codeSnippetParamsMap;
   const codegenResultArray: CodegenResult[] = [];
   const codegenResultRawTemplatesArray: CodegenResult[] = [];
 
   const resultPromises = codegenResultTemplatesArray.map(
     async (codegenResult, index) => {
-      const lines = codegenResult.code.split("\n");
-      const code: string[] = [];
-      for (let i = 0; i < lines.length; i++) {
-        let line = lines[i];
-        const [matches, qualifies] = lineConditionalMatch(line, params);
-        matches.forEach((match) => {
-          line = line.replace(match[0], "");
-        });
-
-        const symbolMatches = [...line.matchAll(regexSymbols)];
-        if (qualifies && symbolMatches.length) {
-          let succeeded = true;
-          for (let j = 0; j < symbolMatches.length; j++) {
-            const symbolMatch = symbolMatches[j];
-            const [match, param, _, filter] = symbolMatch.map((a) =>
-              a ? a.trim() : a
-            ) as [string, string, string, SnippetStringFilter];
-            if (param in params) {
-              const value = transformStringWithFilter(
-                params[param],
-                paramsRaw[param],
-                filter
-              );
-              line = line.replace(match, value);
-            } else if (
-              param === "figma.children" &&
-              recursionIndex < MAX_RECURSION
-            ) {
-              const indentMatch = line.match(/^[ \t]+/);
-              const indent = indentMatch ? indentMatch[0] : "";
-              const childrenValue = await findChildrenSnippets(
-                codegenResult,
-                nodeChildren,
-                indent,
-                recursionIndex + 1,
-                globalTemplates
-              );
-              if (childrenValue) {
-                line = line.replace(/^[ \t]+/, "");
-                line = line.replace(match, childrenValue);
-              } else {
-                succeeded = false;
-              }
-            } else {
-              succeeded = false;
-            }
-          }
-
-          if (succeeded) {
-            line = unescapeBrackets(line);
-            code.push(line);
-          }
-        } else if (qualifies) {
-          line = unescapeBrackets(line);
-          code.push(line);
-        }
-      }
-
-      /**
-       * Single line syntax collapses "/" prefix and suffix into single line spaces
-       * https://github.com/figma/code-snippet-editor-plugin#single-line-syntax
-       */
-      const codeString = code
-        .join("\n")
-        .replace(/\\\\\n/g, "") // collapse single line leading space
-        .replace(/\\\n\\/g, "") // collapse single line trailing space
-        .replace(/\\\n/g, " "); // collapse single line
+      const snippetId = snippetIdFromCodegenResult(codegenResult);
+      const code = await hydrateCodeStringWithParams(
+        codegenResult.code,
+        codeSnippetParamsMap,
+        snippetId,
+        indent,
+        recursionIndex,
+        globalTemplates
+      );
 
       /**
        * Prepend indent to every line.
        */
-      const indentedCodeString =
-        indent + codeString.replace(/\n/g, `\n${indent}`);
+      const indentedCodeString = indent + code.replace(/\n/g, `\n${indent}`);
 
       codegenResultArray[index] = {
         title: codegenResult.title,
@@ -331,48 +332,124 @@ export async function hydrateSnippets(
   };
 }
 
+async function hydrateCodeStringWithParams(
+  codeString: string,
+  codeSnippetParamsMap: CodeSnippetParamsMap,
+  snippetId: string,
+  indent: string,
+  recursionIndex: number,
+  globalTemplates: CodeSnippetGlobalTemplates
+) {
+  const { paramsRaw, params, template } = codeSnippetParamsMap;
+  const lines = codeString.split("\n");
+  const code: string[] = [];
+  const templateChildren = template[snippetId]
+    ? template[snippetId].children
+    : undefined;
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+    const [matches, qualifies] = lineConditionalMatch(
+      line,
+      params,
+      templateChildren
+    );
+    matches.forEach((match) => {
+      line = line.replace(match[0], "");
+    });
+
+    const symbolMatches = [...line.matchAll(regexSymbols)];
+    if (qualifies && symbolMatches.length) {
+      let succeeded = true;
+      for (let j = 0; j < symbolMatches.length; j++) {
+        const symbolMatch = symbolMatches[j];
+        const [match, param, _, filter] = symbolMatch.map((a) =>
+          a ? a.trim() : a
+        ) as [string, string, string, SnippetStringFilter];
+        if (param in params) {
+          const value = transformStringWithFilter(
+            params[param],
+            paramsRaw[param],
+            filter
+          );
+          line = line.replace(match, value);
+        } else if (
+          param === "figma.children" &&
+          recursionIndex < MAX_RECURSION &&
+          templateChildren
+        ) {
+          const indentMatch = line.match(/^[ \t]+/);
+          const indent = indentMatch ? indentMatch[0] : "";
+          const childrenValue = await findChildrenSnippets(
+            templateChildren,
+            indent,
+            recursionIndex + 1,
+            globalTemplates
+          );
+          if (childrenValue) {
+            line = line.replace(/^[ \t]+/, "");
+            line = line.replace(match, childrenValue);
+          } else {
+            succeeded = false;
+          }
+        } else {
+          succeeded = false;
+        }
+      }
+
+      if (succeeded) {
+        line = unescapeBrackets(line);
+        code.push(line);
+      }
+    } else if (qualifies) {
+      line = unescapeBrackets(line);
+      code.push(line);
+    }
+  }
+
+  /**
+   * Single line syntax collapses "/" prefix and suffix into single line spaces
+   * https://github.com/figma/code-snippet-editor-plugin#single-line-syntax
+   */
+  const singleLineFormatted = code
+    .join(`\n`)
+    .replace(/\\\\\n/g, "") // collapse single line leading space
+    .replace(/\\\n\\/g, "") // collapse single line trailing space
+    .replace(/\\\n/g, " "); // collapse single line
+
+  // Indenting each line
+  return indent + singleLineFormatted.split("\n").join(`\n${indent}`);
+}
+
 /**
  *
- * @param codegenResult the template children snippets are being inserted inside of. title and language must map and children templates
- * @param nodeChildren an array of the children to search for templates on
- * @param indent the indentation string
+ * @param childrenSnippetParams an array of children snippet params map
+ * @param indent indentation string
  * @param recursionIndex tracking recursion to prevent infinite loops
  * @param globalTemplates the CodeSnippetGlobalTemplates to reference
  * @returns a Promise that resolves a string of all children snippets with the right indentation.
  */
 async function findChildrenSnippets(
-  codegenResult: CodegenResult,
-  nodeChildren: readonly SceneNode[],
+  childrenSnippetParams: CodeSnippetParamsMap[],
   indent: string,
   recursionIndex: number,
   globalTemplates: CodeSnippetGlobalTemplates
 ): Promise<string> {
   const string: string[] = [];
-  const childPromises = nodeChildren.map(async (child, index) => {
-    const paramsMap = await paramsFromNode(child);
-    const snippets = await nodeSnippetTemplateDataArrayFromNode(
-      child,
-      paramsMap,
-      globalTemplates,
-      indent,
-      recursionIndex + 1,
-      codegenResult
-    );
-    const snippet = snippets
-      .map((s) =>
-        s.codegenResultArray.find(
-          (r) =>
-            r.title === codegenResult.title &&
-            r.language === codegenResult.language
-        )
-      )
-      .find(Boolean);
-    if (snippet) {
-      string[index] = snippet.code;
+  for (let childSnippetParams of childrenSnippetParams) {
+    const snippetId = Object.keys(childSnippetParams.template)[0];
+    const template = childSnippetParams.template[snippetId];
+    if (template) {
+      const hydrated = await hydrateCodeStringWithParams(
+        template.code,
+        childSnippetParams,
+        snippetId,
+        indent,
+        recursionIndex,
+        globalTemplates
+      );
+      string.push(hydrated);
     }
-    return;
-  });
-  await Promise.all(childPromises);
+  }
   return string.filter(Boolean).join("\n");
 }
 
@@ -386,7 +463,8 @@ async function findChildrenSnippets(
  */
 function lineConditionalMatch(
   line: string,
-  params: CodeSnippetParams
+  params: CodeSnippetParams,
+  templateChildren?: CodeSnippetParamsMap[]
 ): [RegExpMatchArray[], boolean] {
   /**
    * Line conditional statement matches.
@@ -421,10 +499,17 @@ function lineConditionalMatch(
       const matches = match.match(/([^=]+)(=([^\}]+))?/);
       if (matches) {
         const [_, symbol, equals, value] = matches;
-        const symbolIsDefined = symbol in params;
-        const paramsMatch = params[symbol] === value;
-        const presenceOnly = !Boolean(equals);
-        return presenceOnly ? symbolIsDefined : paramsMatch;
+        if (symbol === "figma.children") {
+          if (!equals && templateChildren) {
+            return Boolean(templateChildren.length);
+          }
+          return false;
+        } else {
+          const symbolIsDefined = symbol in params;
+          const paramsMatch = params[symbol] === value;
+          const presenceOnly = !Boolean(equals);
+          return presenceOnly ? symbolIsDefined : paramsMatch;
+        }
       } else {
         return false;
       }
