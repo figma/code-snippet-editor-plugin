@@ -71,7 +71,8 @@
     <main>
       <textarea></textarea>
       <div>
-        <button id="save">Save</button>
+        <button id="save">Save to client storage</button>
+        <button style="display: none" id="save-library">Save to library</button>
         <button id="load">Load from page</button>
       </div>
     </main>
@@ -81,12 +82,40 @@
         const data = e.data.pluginMessage;
         if (data.type === "TEMPLATES_INITIALIZE") {
           textarea.value = JSON.stringify(data.templates, null, 2);
+          const button = document.getElementById("save-library");
+          if (data.enableTeamLibraries && button) {
+            if (button) {
+              button.style.display = "initial";
+              button.addEventListener("click", () => {
+                const data = validData();
+                parent.postMessage(
+                  {
+                    pluginMessage: {
+                      type: "TEMPLATES_DATA",
+                      data,
+                      dataEncodedString: btoa(JSON.stringify(data)),
+                      saveToTeamLibrary: true,
+                    },
+                  },
+                  "*"
+                );
+              });
+            }
+          }
         }
       };
       document.getElementById("load").addEventListener("click", () => {
         parent.postMessage({ pluginMessage: { type: "TEMPLATES_LOAD" } }, "*");
       });
       document.getElementById("save").addEventListener("click", () => {
+        const data = validData();
+        parent.postMessage(
+          { pluginMessage: { type: "TEMPLATES_DATA", data } },
+          "*"
+        );
+      });
+
+      function validData() {
         try {
           const data = JSON.parse(textarea.value);
           if (typeof data === "object" && !Array.isArray(data)) {
@@ -100,14 +129,11 @@
           } else {
             throw "invalid";
           }
-          parent.postMessage(
-            { pluginMessage: { type: "TEMPLATES_DATA", data } },
-            "*"
-          );
+          return data;
         } catch (e) {
           window.alert("Invalid JSON");
         }
-      });
+      }
     </script>
   </body>
 </html>

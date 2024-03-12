@@ -117,13 +117,16 @@ type EventFromTemplates =
 type EventFromTemplatesData = {
   type: "TEMPLATES_DATA";
   data: CodeSnippetGlobalTemplates;
+  dataEncodedString?: string;
+  saveToTeamLibrary?: boolean;
 };
 /**
  * Events sending to the tempaltes.html ui
  */
 type EventToTemplates = {
   type: "TEMPLATES_INITIALIZE";
-  templates: CodeSnippetGlobalTemplates | "{}";
+  templates: CodeSnippetGlobalTemplates | {};
+  enableTeamLibraries: boolean;
 };
 
 /**

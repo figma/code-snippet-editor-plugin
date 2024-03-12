@@ -847,6 +847,8 @@ ${indent}`)
 
   // src/templates.ts
   var CLIENT_STORAGE_GLOBAL_TEMPLATES_KEY = "global-templates";
+  var TEMPLATE_VARIABLE_COLLECTION_NAME =
+    "Code Snippet Editor Global Templates";
   function templatesIsCodeSnippetGlobalTemplates(templates) {
     if (typeof templates === "object" && !Array.isArray(templates)) {
       const keys = Object.keys(templates);
@@ -856,6 +858,39 @@ ${indent}`)
       return true;
     }
     return false;
+  }
+  function atob(string) {
+    return new Promise((resolve, reject) => {
+      figma.ui.on("message", (e) =>
+        e.type === "TEMPLATES_ATOB" ? resolve(e.data) : null
+      );
+      figma.showUI(
+        `<script>parent.postMessage({ pluginMessage: { type: "TEMPLATES_ATOB", data: atob("${string}") } }, "*");<\/script>`,
+        { visible: false }
+      );
+    });
+  }
+  async function getGlobalTemplates(useTeamLibraries) {
+    const templates = (await getGlobalTemplatesFromClientStorage()) || {};
+    if (useTeamLibraries) {
+      const collectionsFromTeamLibraries =
+        await figma.teamLibrary.getAvailableLibraryVariableCollectionsAsync();
+      const collection = collectionsFromTeamLibraries.find(
+        (collection2) => collection2.name === TEMPLATE_VARIABLE_COLLECTION_NAME
+      );
+      if (collection) {
+        const libraryVariables =
+          await figma.teamLibrary.getVariablesInLibraryCollectionAsync(
+            collection.key
+          );
+        const variableTemplates = await atob(libraryVariables[0].name);
+        if (variableTemplates) {
+          const json = JSON.parse(variableTemplates);
+          templates.types = json.types;
+        }
+      }
+    }
+    return templates;
   }
   async function loadTemplatesFromPage() {
     const templates = (await getGlobalTemplatesFromClientStorage()) || {};
@@ -882,6 +917,29 @@ ${indent}`)
     return templates && templatesIsCodeSnippetGlobalTemplates(templates)
       ? templates
       : null;
+  }
+  async function setGlobalTemplatesInTeamLibrary(templatesEncodedString) {
+    const collections = figma.variables.getLocalVariableCollections();
+    const collection =
+      collections.find(
+        (collection2) => collection2.name === TEMPLATE_VARIABLE_COLLECTION_NAME
+      ) ||
+      figma.variables.createVariableCollection(
+        TEMPLATE_VARIABLE_COLLECTION_NAME
+      );
+    const variable = collection.variableIds.length
+      ? figma.variables.getVariableById(collection.variableIds[0])
+      : null;
+    if (variable) {
+      variable.name = templatesEncodedString;
+    } else {
+      const vari = figma.variables.createVariable(
+        templatesEncodedString,
+        collection.id,
+        "STRING"
+      );
+      vari.setValueForMode(collection.defaultModeId, "DO NOT TOUCH");
+    }
   }
   async function setGlobalTemplatesInClientStorage(templates) {
     await figma.clientStorage.setAsync(
@@ -913,15 +971,22 @@ ${indent}`)
           figma.currentPage.selection[0],
           event.data
         );
+        figma.notify("Saved to node!");
       } else if (event.type === "TEMPLATES_DATA") {
-        setGlobalTemplatesInClientStorage(event.data);
-        figma.notify("Saved!");
+        if (event.saveToTeamLibrary && event.dataEncodedString) {
+          setGlobalTemplatesInTeamLibrary(event.dataEncodedString);
+          figma.notify("Saved to team library!");
+        } else {
+          setGlobalTemplatesInClientStorage(event.data);
+          figma.notify("Saved to client storage!");
+        }
       } else if (event.type === "TEMPLATES_LOAD") {
         const templates = await loadTemplatesFromPage();
         if (templates) {
           const message = {
             type: "TEMPLATES_INITIALIZE",
             templates,
+            enableTeamLibraries: false,
           };
           figma.ui.postMessage(message);
         } else {
@@ -938,12 +1003,14 @@ ${indent}`)
     figma.on("selectionchange", () => handleCurrentSelection);
     figma.codegen.on("generate", async () => {
       try {
-        const { detailsMode, defaultSnippet } =
+        const { detailsMode, defaultSnippet, useTeamLibraries } =
           figma.codegen.preferences.customSettings;
         const isDetailsMode = detailsMode === "on";
         const hasDefaultMessage = defaultSnippet === "message";
+        const isUsingTeamLibraries = useTeamLibraries === "on";
         const currentNode = handleCurrentSelection();
-        const templates = (await getGlobalTemplatesFromClientStorage()) || {};
+        const templates =
+          (await getGlobalTemplates(isUsingTeamLibraries)) || {};
         const recursiveParamsMap = await recursiveParamsFromNode(
           currentNode,
           templates
@@ -986,20 +1053,47 @@ ${indent}`)
     });
   }
   function initializeDesignMode() {
-    figma.ui.on("message", async (event) => {
-      if (event.type === "BULK_INITIALIZE") {
-        handleCurrentSelection();
-      } else if (event.type === "BULK_EXPORT") {
-        bulk.performExport();
-      } else if (event.type === "BULK_IMPORT") {
-        bulk.performImport(event.data);
-      }
-    });
-    figma.showUI(__uiFiles__.bulk, {
-      width: 600,
-      height: 600,
-      themeColors: true,
-    });
+    if (figma.command === "global") {
+      figma.ui.on("message", async (event) => {
+        if (event.type === "TEMPLATES_DATA") {
+          if (event.saveToTeamLibrary && event.dataEncodedString) {
+            setGlobalTemplatesInTeamLibrary(event.dataEncodedString);
+            figma.notify("Saved to team library!");
+          } else {
+            setGlobalTemplatesInClientStorage(event.data);
+            figma.notify("Saved to client storage!");
+          }
+        } else if (event.type === "TEMPLATES_LOAD") {
+          const templates = await loadTemplatesFromPage();
+          if (templates) {
+            const message = {
+              type: "TEMPLATES_INITIALIZE",
+              templates,
+              enableTeamLibraries: false,
+            };
+            figma.ui.postMessage(message);
+          } else {
+            figma.notify("No templates defined on this page");
+          }
+        }
+      });
+      openTemplateUI();
+    } else if (figma.command === "bulk") {
+      figma.ui.on("message", async (event) => {
+        if (event.type === "BULK_INITIALIZE") {
+          handleCurrentSelection();
+        } else if (event.type === "BULK_EXPORT") {
+          bulk.performExport();
+        } else if (event.type === "BULK_IMPORT") {
+          bulk.performImport(event.data);
+        }
+      });
+      figma.showUI(__uiFiles__.bulk, {
+        width: 600,
+        height: 600,
+        themeColors: true,
+      });
+    }
   }
   function openCodeSnippetEditorUI() {
     const { x, y, width, height } = figma.viewport.bounds;
@@ -1018,13 +1112,19 @@ ${indent}`)
     });
   }
   async function openTemplateUI() {
+    const { useTeamLibraries } = figma.codegen.preferences.customSettings;
+    const isUsingTeamLibraries = useTeamLibraries === "on";
     figma.showUI(__uiFiles__.templates, {
       width: 600,
       height: 600,
       themeColors: true,
     });
-    const templates = (await getGlobalTemplatesFromClientStorage()) || "{}";
-    const message = { type: "TEMPLATES_INITIALIZE", templates };
+    const templates = (await getGlobalTemplates(isUsingTeamLibraries)) || {};
+    const message = {
+      type: "TEMPLATES_INITIALIZE",
+      templates,
+      enableTeamLibraries: figma.editorType === "figma" && isUsingTeamLibraries,
+    };
     figma.ui.postMessage(message);
   }
   function codegenResultsFromNodeSnippetTemplateDataArray(

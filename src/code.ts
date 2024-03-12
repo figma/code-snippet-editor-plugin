@@ -7,8 +7,8 @@ import { recursiveParamsFromNode } from "./params";
 import { nodeSnippetTemplateDataArrayFromNode } from "./snippets";
 import {
   getGlobalTemplates,
-  getGlobalTemplatesFromClientStorage,
   setGlobalTemplatesInClientStorage,
+  setGlobalTemplatesInTeamLibrary,
   loadTemplatesFromPage,
 } from "./templates";
 
@@ -51,15 +51,22 @@ async function initializeCodegenMode() {
           figma.currentPage.selection[0],
           event.data
         );
+        figma.notify("Saved to node!");
       } else if (event.type === "TEMPLATES_DATA") {
-        setGlobalTemplatesInClientStorage(event.data);
-        figma.notify("Saved!");
+        if (event.saveToTeamLibrary && event.dataEncodedString) {
+          setGlobalTemplatesInTeamLibrary(event.dataEncodedString);
+          figma.notify("Saved to team library!");
+        } else {
+          setGlobalTemplatesInClientStorage(event.data);
+          figma.notify("Saved to client storage!");
+        }
       } else if (event.type === "TEMPLATES_LOAD") {
         const templates = await loadTemplatesFromPage();
         if (templates) {
           const message: EventToTemplates = {
             type: "TEMPLATES_INITIALIZE",
             templates,
+            enableTeamLibraries: false,
           };
           figma.ui.postMessage(message);
         } else {
@@ -91,13 +98,14 @@ async function initializeCodegenMode() {
        *   what to render when there is no template to render.
        * https://github.com/figma/code-snippet-editor-plugin#details-mode
        */
-      const { detailsMode, defaultSnippet } =
+      const { detailsMode, defaultSnippet, useTeamLibraries } =
         figma.codegen.preferences.customSettings;
       const isDetailsMode = detailsMode === "on";
       const hasDefaultMessage = defaultSnippet === "message";
+      const isUsingTeamLibraries = useTeamLibraries === "on";
       const currentNode = handleCurrentSelection();
 
-      const templates = (await getGlobalTemplatesFromClientStorage()) || {};
+      const templates = (await getGlobalTemplates(isUsingTeamLibraries)) || {};
       const recursiveParamsMap = await recursiveParamsFromNode(
         currentNode,
         templates
@@ -157,21 +165,47 @@ async function initializeCodegenMode() {
  *   and helpers for loading node data and component data.
  */
 function initializeDesignMode() {
-  figma.ui.on("message", async (event: EventFromBulk) => {
-    if (event.type === "BULK_INITIALIZE") {
-      handleCurrentSelection();
-    } else if (event.type === "BULK_EXPORT") {
-      bulk.performExport();
-    } else if (event.type === "BULK_IMPORT") {
-      bulk.performImport(event.data);
-    }
-  });
-
-  figma.showUI(__uiFiles__.bulk, {
-    width: 600,
-    height: 600,
-    themeColors: true,
-  });
+  if (figma.command === "global") {
+    figma.ui.on("message", async (event: EventFromTemplates) => {
+      if (event.type === "TEMPLATES_DATA") {
+        if (event.saveToTeamLibrary && event.dataEncodedString) {
+          setGlobalTemplatesInTeamLibrary(event.dataEncodedString);
+          figma.notify("Saved to team library!");
+        } else {
+          setGlobalTemplatesInClientStorage(event.data);
+          figma.notify("Saved to client storage!");
+        }
+      } else if (event.type === "TEMPLATES_LOAD") {
+        const templates = await loadTemplatesFromPage();
+        if (templates) {
+          const message: EventToTemplates = {
+            type: "TEMPLATES_INITIALIZE",
+            templates,
+            enableTeamLibraries: false,
+          };
+          figma.ui.postMessage(message);
+        } else {
+          figma.notify("No templates defined on this page");
+        }
+      }
+    });
+    openTemplateUI();
+  } else if (figma.command === "bulk") {
+    figma.ui.on("message", async (event: EventFromBulk) => {
+      if (event.type === "BULK_INITIALIZE") {
+        handleCurrentSelection();
+      } else if (event.type === "BULK_EXPORT") {
+        bulk.performExport();
+      } else if (event.type === "BULK_IMPORT") {
+        bulk.performImport(event.data);
+      }
+    });
+    figma.showUI(__uiFiles__.bulk, {
+      width: 600,
+      height: 600,
+      themeColors: true,
+    });
+  }
 }
 
 /**
@@ -198,13 +232,19 @@ function openCodeSnippetEditorUI() {
  * Opening the UI for templates and sending a message with the initial template data
  */
 async function openTemplateUI() {
+  const { useTeamLibraries } = figma.codegen.preferences.customSettings;
+  const isUsingTeamLibraries = useTeamLibraries === "on";
   figma.showUI(__uiFiles__.templates, {
     width: 600,
     height: 600,
     themeColors: true,
   });
-  const templates = (await getGlobalTemplatesFromClientStorage()) || "{}";
-  const message: EventToTemplates = { type: "TEMPLATES_INITIALIZE", templates };
+  const templates = (await getGlobalTemplates(isUsingTeamLibraries)) || {};
+  const message: EventToTemplates = {
+    type: "TEMPLATES_INITIALIZE",
+    templates,
+    enableTeamLibraries: figma.editorType === "figma" && isUsingTeamLibraries,
+  };
   figma.ui.postMessage(message);
 }
 

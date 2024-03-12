@@ -22,6 +22,11 @@ function templatesIsCodeSnippetGlobalTemplates(
   return false;
 }
 
+/**
+ * Decoding a base64 encoded string through an invisible iframe
+ * @param string the string to decode
+ * @returns decoded string
+ */
 function atob(string: string): Promise<string> {
   return new Promise((resolve, reject) => {
     figma.ui.on("message", (e) =>
@@ -34,6 +39,11 @@ function atob(string: string): Promise<string> {
   });
 }
 
+/**
+ * Encoding a base64 string through an invisible iframe
+ * @param string the string to encode
+ * @returns encoded string
+ */
 function btoa(string: string): Promise<string> {
   return new Promise((resolve, reject) => {
     figma.ui.on("message", (e) =>
@@ -46,24 +56,33 @@ function btoa(string: string): Promise<string> {
   });
 }
 
-export async function getGlobalTemplates(): Promise<CodeSnippetGlobalTemplates | null> {
+/**
+ * Getting a global templates object from client storage, and optionally overriding with team libraries
+ * @param useTeamLibraries whether or not to check team libraries for templates
+ * @returns Promise resolving CodeSnippetGlobalTemplates
+ */
+export async function getGlobalTemplates(
+  useTeamLibraries: boolean
+): Promise<CodeSnippetGlobalTemplates> {
   const templates = (await getGlobalTemplatesFromClientStorage()) || {};
-  // const collectionsFromTeamLibraries =
-  //   await figma.teamLibrary.getAvailableLibraryVariableCollectionsAsync();
-  // const collection = collectionsFromTeamLibraries.find(
-  //   (collection) => collection.name === TEMPLATE_VARIABLE_COLLECTION_NAME
-  // );
-  // if (collection) {
-  //   const libraryVariables =
-  //     await figma.teamLibrary.getVariablesInLibraryCollectionAsync(
-  //       collection.key
-  //     );
-  //   const variableTemplates = await atob(libraryVariables[0].name);
-  //   if (variableTemplates) {
-  //     const json = JSON.parse(variableTemplates);
-  //     templates.types = json.types;
-  //   }
-  // }
+  if (useTeamLibraries) {
+    const collectionsFromTeamLibraries =
+      await figma.teamLibrary.getAvailableLibraryVariableCollectionsAsync();
+    const collection = collectionsFromTeamLibraries.find(
+      (collection) => collection.name === TEMPLATE_VARIABLE_COLLECTION_NAME
+    );
+    if (collection) {
+      const libraryVariables =
+        await figma.teamLibrary.getVariablesInLibraryCollectionAsync(
+          collection.key
+        );
+      const variableTemplates = await atob(libraryVariables[0].name);
+      if (variableTemplates) {
+        const json = JSON.parse(variableTemplates);
+        templates.types = json.types;
+      }
+    }
+  }
   return templates;
 }
 
@@ -96,13 +115,41 @@ export async function loadTemplatesFromPage(): Promise<CodeSnippetGlobalTemplate
  * https://www.figma.com/plugin-docs/api/figma-clientStorage
  * @returns Promise resolving CodeSnippetGlobalTemplates object or null
  */
-export async function getGlobalTemplatesFromClientStorage(): Promise<CodeSnippetGlobalTemplates | null> {
+async function getGlobalTemplatesFromClientStorage(): Promise<CodeSnippetGlobalTemplates | null> {
   const templates = await figma.clientStorage.getAsync(
     CLIENT_STORAGE_GLOBAL_TEMPLATES_KEY
   );
   return templates && templatesIsCodeSnippetGlobalTemplates(templates)
     ? templates
     : null;
+}
+
+/**
+ * Saving templates encoded in a variable collection
+ * @param templates CodeSnippetGlobalTemplates object to save in figma variable collection
+ */
+export async function setGlobalTemplatesInTeamLibrary(
+  templatesEncodedString: string
+): Promise<void> {
+  const collections = figma.variables.getLocalVariableCollections();
+  const collection =
+    collections.find(
+      (collection) => collection.name === TEMPLATE_VARIABLE_COLLECTION_NAME
+    ) ||
+    figma.variables.createVariableCollection(TEMPLATE_VARIABLE_COLLECTION_NAME);
+  const variable = collection.variableIds.length
+    ? figma.variables.getVariableById(collection.variableIds[0])
+    : null;
+  if (variable) {
+    variable.name = templatesEncodedString;
+  } else {
+    const vari = figma.variables.createVariable(
+      templatesEncodedString,
+      collection.id,
+      "STRING"
+    );
+    vari.setValueForMode(collection.defaultModeId, "DO NOT TOUCH");
+  }
 }
 
 /**
