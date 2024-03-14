@@ -19,7 +19,7 @@
     "RUST",
     "SQL",
     "SWIFT",
-    "TYPESCRIPT",
+    "TYPESCRIPT"
   ];
   function getCodegenResultsFromPluginData(node) {
     const pluginData = node.getSharedPluginData(
@@ -40,8 +40,10 @@
     return CODEGEN_LANGUAGES.includes(value);
   }
   function objectIsCodegenResult(object) {
-    if (typeof object !== "object") return false;
-    if (Object.keys(object).length !== 3) return false;
+    if (typeof object !== "object")
+      return false;
+    if (Object.keys(object).length !== 3)
+      return false;
     if (!("title" in object && "code" in object && "language" in object))
       return false;
     if (typeof object.title !== "string" || typeof object.code !== "string")
@@ -62,63 +64,14 @@
     return valid;
   }
   function pluginDataStringAsValidCodegenResults(pluginDataString) {
-    if (!pluginDataString) return null;
+    if (!pluginDataString)
+      return null;
     try {
       const parsed = JSON.parse(pluginDataString);
       return arrayContainsCodegenResults(parsed) ? parsed : null;
     } catch (e) {
       return null;
     }
-  }
-
-  // src/bulk.ts
-  var bulk = {
-    performImport,
-    performExport,
-  };
-  function performImport(data) {
-    const componentsByKey = getComponentsInFileByKey();
-    let componentCount = 0;
-    for (let componentKey in data) {
-      const component = componentsByKey[componentKey];
-      if (component) {
-        componentCount++;
-        setCodegenResultsInPluginData(component, data[componentKey]);
-      }
-    }
-    const s = componentCount === 1 ? "" : "s";
-    figma.notify(`Updated ${componentCount} Component${s}`);
-  }
-  function performExport() {
-    const data = {};
-    const components = findComponentNodesInFile();
-    components.forEach((component) => {
-      const codegenResults = getCodegenResultsFromPluginData(component);
-      if (codegenResults && codegenResults.length) {
-        data[component.key] = codegenResults;
-      }
-    });
-    const message = {
-      type: "BULK_EXPORT",
-      code: JSON.stringify(data, null, 2),
-    };
-    figma.ui.postMessage(message);
-  }
-  function findComponentNodesInFile() {
-    if (figma.currentPage.parent) {
-      return (
-        figma.currentPage.parent.findAllWithCriteria({
-          types: ["COMPONENT", "COMPONENT_SET"],
-        }) || []
-      );
-    }
-    return [];
-  }
-  function getComponentsInFileByKey() {
-    const components = findComponentNodesInFile();
-    const data = {};
-    components.forEach((component) => (data[component.key] = component));
-    return data;
   }
 
   // src/snippets.ts
@@ -131,27 +84,22 @@
   var regexConditionals = [
     regexConditionalSingle,
     regexConditionalOr,
-    regexConditionalAnd,
+    regexConditionalAnd
   ].join("|");
-  var regexConditional = new RegExp(`{{([?!])(${regexConditionals})}}`, "g");
-  async function nodeSnippetTemplateDataArrayFromNode(
-    node,
-    codeSnippetParamsMap,
-    globalTemplates,
-    indent = "",
-    recursionIndex = 0,
-    parentCodegenResult
-  ) {
+  var regexConditional = new RegExp(
+    `{{([?!])(${regexConditionals})}}`,
+    "g"
+  );
+  async function nodeSnippetTemplateDataArrayFromNode(node, codeSnippetParamsMap, globalTemplates, indent = "", recursionIndex = 0, parentCodegenResult) {
     const nodeSnippetTemplateDataArray = [];
-    const templatesWithInheritanceNode =
-      await snippetTemplatesWithInheritanceNode(
-        node,
-        globalTemplates,
-        parentCodegenResult
-      );
+    const templatesWithInheritanceNode = await snippetTemplatesWithInheritanceNode(
+      node,
+      globalTemplates,
+      parentCodegenResult
+    );
     for (let [
       inheritanceNode,
-      snippetTemplates,
+      snippetTemplates
     ] of templatesWithInheritanceNode) {
       const nodeSnippetTemplateData = await hydrateSnippets(
         snippetTemplates,
@@ -165,18 +113,10 @@
     }
     return nodeSnippetTemplateDataArray;
   }
-  async function snippetTemplatesWithInheritanceNode(
-    node,
-    globalTemplates,
-    parentCodegenResult
-  ) {
+  async function snippetTemplatesWithInheritanceNode(node, globalTemplates, parentCodegenResult) {
     const seenSnippetTemplates = {};
     const nodeAndTemplates = [];
-    if (
-      node.type === "COMPONENT" &&
-      node.parent &&
-      node.parent.type === "COMPONENT_SET"
-    ) {
+    if (node.type === "COMPONENT" && node.parent && node.parent.type === "COMPONENT_SET") {
       const componentSetTemplates = await snippetTemplatesForNode(
         node.parent,
         seenSnippetTemplates,
@@ -188,10 +128,7 @@
       }
     } else if (node.type === "INSTANCE") {
       if (node.mainComponent) {
-        if (
-          node.mainComponent.parent &&
-          node.mainComponent.parent.type === "COMPONENT_SET"
-        ) {
+        if (node.mainComponent.parent && node.mainComponent.parent.type === "COMPONENT_SET") {
           const componentSetTemplates = await snippetTemplatesForNode(
             node.mainComponent.parent,
             seenSnippetTemplates,
@@ -201,7 +138,7 @@
           if (componentSetTemplates.length) {
             nodeAndTemplates.push([
               node.mainComponent.parent,
-              componentSetTemplates,
+              componentSetTemplates
             ]);
           }
         }
@@ -227,20 +164,11 @@
     }
     return nodeAndTemplates;
   }
-  async function snippetTemplatesForNode(
-    snippetNode,
-    seenSnippetTemplates,
-    globalTemplates,
-    parentCodegenResult
-  ) {
+  async function snippetTemplatesForNode(snippetNode, seenSnippetTemplates, globalTemplates, parentCodegenResult) {
     const codegenResults = getCodegenResultsFromPluginData(snippetNode);
-    const matchingTemplates = (templates) =>
-      templates.filter(
-        ({ title, language }) =>
-          !parentCodegenResult ||
-          (title === parentCodegenResult.title &&
-            language === parentCodegenResult.language)
-      );
+    const matchingTemplates = (templates) => templates.filter(
+      ({ title, language }) => !parentCodegenResult || title === parentCodegenResult.title && language === parentCodegenResult.language
+    );
     const matchingCodegenResults = matchingTemplates(codegenResults);
     const codegenResultTemplates = [];
     if (matchingCodegenResults.length) {
@@ -251,25 +179,15 @@
       }
     }
     if (globalTemplates.components) {
-      const componentTemplates =
-        "key" in snippetNode
-          ? globalTemplates.components[snippetNode.key] || []
-          : [];
+      const componentTemplates = "key" in snippetNode ? globalTemplates.components[snippetNode.key] || [] : [];
       codegenResultTemplates.push(...matchingTemplates(componentTemplates));
     }
-    if (
-      !Object.keys(seenSnippetTemplates).length &&
-      !codegenResultTemplates.length &&
-      globalTemplates.types
-    ) {
+    if (!Object.keys(seenSnippetTemplates).length && !codegenResultTemplates.length && globalTemplates.types) {
       const typeTemplates = globalTemplates.types[snippetNode.type] || [];
       const seenKey = JSON.stringify(typeTemplates);
       if (!seenSnippetTemplates[seenKey]) {
         seenSnippetTemplates[seenKey] = 1;
-        const defaultTemplates =
-          !typeTemplates.length && globalTemplates.types.DEFAULT
-            ? globalTemplates.types.DEFAULT
-            : [];
+        const defaultTemplates = !typeTemplates.length && globalTemplates.types.DEFAULT ? globalTemplates.types.DEFAULT : [];
         codegenResultTemplates.push(...matchingTemplates(typeTemplates));
         codegenResultTemplates.push(...matchingTemplates(defaultTemplates));
       }
@@ -281,9 +199,7 @@
     const capitalize2 = (s) => s.charAt(0).toUpperCase() + s.substring(1);
     switch (filter) {
       case "camel":
-        return splitString
-          .map((word, i) => (i === 0 ? word : capitalize2(word)))
-          .join("");
+        return splitString.map((word, i) => i === 0 ? word : capitalize2(word)).join("");
       case "constant":
         return splitString.join("_").toUpperCase();
       case "hyphen":
@@ -297,14 +213,7 @@
     }
     return splitString.join(" ");
   }
-  async function hydrateSnippets(
-    codegenResultTemplatesArray,
-    codeSnippetParamsMap,
-    nodeType,
-    indent,
-    recursionIndex,
-    globalTemplates
-  ) {
+  async function hydrateSnippets(codegenResultTemplatesArray, codeSnippetParamsMap, nodeType, indent, recursionIndex, globalTemplates) {
     const codegenResultArray = [];
     const codegenResultRawTemplatesArray = [];
     const resultPromises = codegenResultTemplatesArray.map(
@@ -318,22 +227,17 @@
           recursionIndex,
           globalTemplates
         );
-        const indentedCodeString =
-          indent +
-          code.replace(
-            /\n/g,
-            `
-${indent}`
-          );
+        const indentedCodeString = indent + code.replace(/\n/g, `
+${indent}`);
         codegenResultArray[index] = {
           title: codegenResult.title,
           language: codegenResult.language,
-          code: indentedCodeString,
+          code: indentedCodeString
         };
         codegenResultRawTemplatesArray[index] = {
           title: `${codegenResult.title}: Template (${nodeType})`,
           language: "PLAINTEXT",
-          code: codegenResult.code,
+          code: codegenResult.code
         };
         return;
       }
@@ -341,23 +245,14 @@ ${indent}`
     await Promise.all(resultPromises);
     return {
       codegenResultRawTemplatesArray,
-      codegenResultArray,
+      codegenResultArray
     };
   }
-  async function hydrateCodeStringWithParams(
-    codeString,
-    codeSnippetParamsMap,
-    snippetId,
-    indent,
-    recursionIndex,
-    globalTemplates
-  ) {
+  async function hydrateCodeStringWithParams(codeString, codeSnippetParamsMap, snippetId, indent, recursionIndex, globalTemplates) {
     const { paramsRaw, params, template } = codeSnippetParamsMap;
     const lines = codeString.split("\n");
     const code = [];
-    const templateChildren = template[snippetId]
-      ? template[snippetId].children
-      : void 0;
+    const templateChildren = template[snippetId] ? template[snippetId].children : void 0;
     for (let i = 0; i < lines.length; i++) {
       let line = lines[i];
       const [matches, qualifies] = lineConditionalMatch(
@@ -373,8 +268,8 @@ ${indent}`
         let succeeded = true;
         for (let j = 0; j < symbolMatches.length; j++) {
           const symbolMatch = symbolMatches[j];
-          const [match, param, _, filter] = symbolMatch.map((a) =>
-            a ? a.trim() : a
+          const [match, param, _, filter] = symbolMatch.map(
+            (a) => a ? a.trim() : a
           );
           if (param in params) {
             const value = transformStringWithFilter(
@@ -383,11 +278,7 @@ ${indent}`
               filter
             );
             line = line.replace(match, value);
-          } else if (
-            param === "figma.children" &&
-            recursionIndex < MAX_RECURSION &&
-            templateChildren
-          ) {
+          } else if (param === "figma.children" && recursionIndex < MAX_RECURSION && templateChildren) {
             const indentMatch = line.match(/^[ \t]+/);
             const indent2 = indentMatch ? indentMatch[0] : "";
             const childrenValue = await findChildrenSnippets(
@@ -415,26 +306,12 @@ ${indent}`
         code.push(line);
       }
     }
-    const singleLineFormatted = code
-      .join(
-        `
-`
-      )
-      .replace(/\\\\\n/g, "")
-      .replace(/\\\n\\/g, "")
-      .replace(/\\\n/g, " ");
-    return (
-      indent +
-      singleLineFormatted.split("\n").join(`
-${indent}`)
-    );
+    const singleLineFormatted = code.join(`
+`).replace(/\\\\\n/g, "").replace(/\\\n\\/g, "").replace(/\\\n/g, " ");
+    return indent + singleLineFormatted.split("\n").join(`
+${indent}`);
   }
-  async function findChildrenSnippets(
-    childrenSnippetParams,
-    indent,
-    recursionIndex,
-    globalTemplates
-  ) {
+  async function findChildrenSnippets(childrenSnippetParams, indent, recursionIndex, globalTemplates) {
     const string = [];
     for (let childSnippetParams of childrenSnippetParams) {
       const snippetId = Object.keys(childSnippetParams.template)[0];
@@ -460,8 +337,9 @@ ${indent}`)
     }
     let valid = true;
     matches.forEach((match) => {
-      const [_, polarity, statements, matchSingle, matchOr, matchAnd] =
-        match.map((a) => (a ? a.trim() : a));
+      const [_, polarity, statements, matchSingle, matchOr, matchAnd] = match.map(
+        (a) => a ? a.trim() : a
+      );
       const isNegative = polarity === "!";
       const isPositive = polarity === "?";
       const isSingle = Boolean(matchSingle);
@@ -502,8 +380,7 @@ ${indent}`)
 
   // src/params.ts
   async function paramsFromNode(node, propertiesOnly = false) {
-    const { componentPropValuesMap, instanceParamsMap } =
-      await componentPropertyDataFromNode(node);
+    const { componentPropValuesMap, instanceParamsMap } = await componentPropertyDataFromNode(node);
     const params = {};
     const paramsRaw = {};
     for (let key in componentPropValuesMap) {
@@ -522,8 +399,7 @@ ${indent}`)
         paramsRaw[`property.${key}`] = value;
       }
       if (itemKeys.includes("INSTANCE_SWAP") && instanceParamsMap[key]) {
-        const keyPrefix =
-          itemKeys.length > 1 ? `property.${key}.i` : `property.${key}`;
+        const keyPrefix = itemKeys.length > 1 ? `property.${key}.i` : `property.${key}`;
         for (let k in instanceParamsMap[key].params) {
           params[`${keyPrefix}.${k}`] = safeString(
             instanceParamsMap[key].params[k]
@@ -539,21 +415,14 @@ ${indent}`)
     return {
       params: Object.assign(params, initial.params),
       paramsRaw: Object.assign(paramsRaw, initial.paramsRaw),
-      template: {},
+      template: {}
     };
   }
   function snippetIdFromCodegenResult(codegenResult) {
     return `${codegenResult.title}-${codegenResult.language}`;
   }
-  async function recursiveParamsFromNode(
-    node,
-    globalTemplates,
-    specificSnippetId
-  ) {
-    const children =
-      "children" in node
-        ? node.children.filter((n) => ("visible" in n ? n.visible : true))
-        : [];
+  async function recursiveParamsFromNode(node, globalTemplates, specificSnippetId) {
+    const children = "children" in node ? node.children.filter((n) => "visible" in n ? n.visible : true) : [];
     const childrenTemplatesObject = {};
     for (let child of children) {
       const templatesArray = await snippetTemplatesWithInheritanceNode(
@@ -564,8 +433,7 @@ ${indent}`)
       templates.forEach((template) => {
         const snippetId = snippetIdFromCodegenResult(template);
         if (!specificSnippetId || snippetId === specificSnippetId) {
-          childrenTemplatesObject[snippetId] =
-            childrenTemplatesObject[snippetId] || [];
+          childrenTemplatesObject[snippetId] = childrenTemplatesObject[snippetId] || [];
           childrenTemplatesObject[snippetId].push(child);
         }
       });
@@ -580,29 +448,19 @@ ${indent}`)
       const snippetId = snippetIdFromCodegenResult(template);
       if (!specificSnippetId || snippetId === specificSnippetId) {
         nodeTemplatesObject[snippetId] = nodeTemplatesObject[snippetId] || {
-          code: template.code,
+          code: template.code
         };
         if (template.code.match(/\{\{ *figma.children *\}\}/)) {
           if (childrenTemplatesObject[snippetId]) {
             nodeTemplatesObject[snippetId].children = await Promise.all(
               childrenTemplatesObject[snippetId].map(
-                async (child) =>
-                  await recursiveParamsFromNode(
-                    child,
-                    globalTemplates,
-                    snippetId
-                  )
+                async (child) => await recursiveParamsFromNode(child, globalTemplates, snippetId)
               )
             );
           }
         }
-        if (
-          template.code.match(/\{\{ *figma.svg *\}\}/) &&
-          "exportAsync" in node
-        ) {
-          nodeTemplatesObject[snippetId].svg = (
-            await node.exportAsync({ format: "SVG" })
-          ).toString();
+        if (template.code.match(/\{\{ *figma.svg *\}\}/) && "exportAsync" in node) {
+          nodeTemplatesObject[snippetId].svg = (await node.exportAsync({ format: "SVG" })).toString();
         }
       }
     }
@@ -610,28 +468,25 @@ ${indent}`)
     return {
       params,
       paramsRaw,
-      template: nodeTemplatesObject,
+      template: nodeTemplatesObject
     };
   }
   async function componentPropertyDataFromNode(node) {
     const componentPropObject = componentPropObjectFromNode(node);
     const componentPropValuesMap = {};
-    const isDefinitions =
-      isComponentPropertyDefinitionsObject(componentPropObject);
+    const isDefinitions = isComponentPropertyDefinitionsObject(componentPropObject);
     const instanceParamsMap = {};
     for (let propertyName in componentPropObject) {
-      const value = isDefinitions
-        ? componentPropObject[propertyName].defaultValue
-        : componentPropObject[propertyName].value;
+      const value = isDefinitions ? componentPropObject[propertyName].defaultValue : componentPropObject[propertyName].value;
       const type = componentPropObject[propertyName].type;
       const cleanName = sanitizePropertyName(propertyName);
       if (value !== void 0) {
-        componentPropValuesMap[cleanName] =
-          componentPropValuesMap[cleanName] || {};
+        componentPropValuesMap[cleanName] = componentPropValuesMap[cleanName] || {};
         if (typeof value === "string") {
           if (type === "VARIANT")
             componentPropValuesMap[cleanName].VARIANT = value;
-          if (type === "TEXT") componentPropValuesMap[cleanName].TEXT = value;
+          if (type === "TEXT")
+            componentPropValuesMap[cleanName].TEXT = value;
           if (type === "INSTANCE_SWAP") {
             const foundNode = await figma.getNodeById(value);
             const nodeName = nameFromFoundInstanceSwapNode(foundNode);
@@ -651,24 +506,19 @@ ${indent}`)
     return { componentPropValuesMap, instanceParamsMap };
   }
   function nameFromFoundInstanceSwapNode(node) {
-    return node && node.parent && node.parent.type === "COMPONENT_SET"
-      ? node.parent.name
-      : node
-      ? node.name
-      : "";
+    return node && node.parent && node.parent.type === "COMPONENT_SET" ? node.parent.name : node ? node.name : "";
   }
   async function initialParamsFromNode(node) {
     const componentNode = getComponentNodeFromNode(node);
     const css = await node.getCSSAsync();
-    const autolayout =
-      "inferredAutoLayout" in node ? node.inferredAutoLayout : void 0;
+    const autolayout = "inferredAutoLayout" in node ? node.inferredAutoLayout : void 0;
     const paramsRaw = {
       "node.name": node.name,
-      "node.type": node.type,
+      "node.type": node.type
     };
     const params = {
       "node.name": safeString(node.name),
-      "node.type": safeString(node.type),
+      "node.type": safeString(node.type)
     };
     if ("key" in node) {
       paramsRaw["node.key"] = node.key;
@@ -746,7 +596,7 @@ ${indent}`)
         "itemSpacing",
         "counterAxisSpacing",
         "primaryAxisAlignItems",
-        "counterAxisAlignItems",
+        "counterAxisAlignItems"
       ];
       props.forEach((p) => {
         const val = autolayout[p] + "";
@@ -759,14 +609,13 @@ ${indent}`)
     return { params, paramsRaw, template: {} };
   }
   function isComponentPropertyDefinitionsObject(object) {
-    return (
-      object[Object.keys(object)[0]] &&
-      "defaultValue" in object[Object.keys(object)[0]]
-    );
+    return object[Object.keys(object)[0]] && "defaultValue" in object[Object.keys(object)[0]];
   }
   function componentPropObjectFromNode(node) {
-    if (node.type === "INSTANCE") return node.componentProperties;
-    if (node.type === "COMPONENT_SET") return node.componentPropertyDefinitions;
+    if (node.type === "INSTANCE")
+      return node.componentProperties;
+    if (node.type === "COMPONENT_SET")
+      return node.componentPropertyDefinitions;
     if (node.type === "COMPONENT") {
       if (node.parent && node.parent.type === "COMPONENT_SET") {
         const initialProps = Object.assign(
@@ -799,10 +648,7 @@ ${indent}`)
   }
   function capitalizedNameFromName(name = "") {
     name = numericGuard(name);
-    return name
-      .split(/[^a-zA-Z\d]+/g)
-      .map(capitalize)
-      .join("");
+    return name.split(/[^a-zA-Z\d]+/g).map(capitalize).join("");
   }
   function sanitizePropertyName(name) {
     name = name.replace(/#[^#]+$/g, "");
@@ -812,21 +658,13 @@ ${indent}`)
     const { type, parent } = node;
     const parentType = parent ? parent.type : "";
     const isVariant = parentType === "COMPONENT_SET";
-    if (type === "COMPONENT_SET" || (type === "COMPONENT" && !isVariant)) {
+    if (type === "COMPONENT_SET" || type === "COMPONENT" && !isVariant) {
       return node;
-    } else if (
-      node.type === "COMPONENT" &&
-      node.parent &&
-      node.parent.type === "COMPONENT_SET"
-    ) {
+    } else if (node.type === "COMPONENT" && node.parent && node.parent.type === "COMPONENT_SET") {
       return node.parent;
     } else if (type === "INSTANCE") {
       const { mainComponent } = node;
-      return mainComponent
-        ? mainComponent.parent && mainComponent.parent.type === "COMPONENT_SET"
-          ? mainComponent.parent
-          : mainComponent
-        : null;
+      return mainComponent ? mainComponent.parent && mainComponent.parent.type === "COMPONENT_SET" ? mainComponent.parent : mainComponent : null;
     }
     return null;
   }
@@ -835,20 +673,12 @@ ${indent}`)
     if (!string.match(/^[A-Z0-9_]+$/)) {
       string = string.replace(/([A-Z])/g, " $1");
     }
-    return string
-      .replace(/([a-z])([0-9])/g, "$1 $2")
-      .replace(/([-_/])/g, " ")
-      .replace(/  +/g, " ")
-      .trim()
-      .toLowerCase()
-      .split(" ")
-      .join("-");
+    return string.replace(/([a-z])([0-9])/g, "$1 $2").replace(/([-_/])/g, " ").replace(/  +/g, " ").trim().toLowerCase().split(" ").join("-");
   }
 
   // src/templates.ts
   var CLIENT_STORAGE_GLOBAL_TEMPLATES_KEY = "global-templates";
-  var TEMPLATE_VARIABLE_COLLECTION_NAME =
-    "Code Snippet Editor Global Templates";
+  var TEMPLATE_VARIABLE_COLLECTION_NAME = "Code Snippet Editor Global Templates";
   function templatesIsCodeSnippetGlobalTemplates(templates) {
     if (typeof templates === "object" && !Array.isArray(templates)) {
       const keys = Object.keys(templates);
@@ -859,41 +689,21 @@ ${indent}`)
     }
     return false;
   }
-  function atob(string) {
-    return new Promise((resolve, reject) => {
-      figma.ui.on("message", (e) =>
-        e.type === "TEMPLATES_ATOB" ? resolve(e.data) : null
+  async function getEncodedGlobalTemplatesFromTeamLibrary() {
+    const collectionsFromTeamLibraries = await figma.teamLibrary.getAvailableLibraryVariableCollectionsAsync();
+    const collection = collectionsFromTeamLibraries.find(
+      (collection2) => collection2.name === TEMPLATE_VARIABLE_COLLECTION_NAME
+    );
+    if (collection) {
+      const libraryVariables = await figma.teamLibrary.getVariablesInLibraryCollectionAsync(
+        collection.key
       );
-      figma.showUI(
-        `<script>parent.postMessage({ pluginMessage: { type: "TEMPLATES_ATOB", data: atob("${string}") } }, "*");<\/script>`,
-        { visible: false }
-      );
-    });
-  }
-  async function getGlobalTemplates(useTeamLibraries) {
-    const templates = (await getGlobalTemplatesFromClientStorage()) || {};
-    if (useTeamLibraries) {
-      const collectionsFromTeamLibraries =
-        await figma.teamLibrary.getAvailableLibraryVariableCollectionsAsync();
-      const collection = collectionsFromTeamLibraries.find(
-        (collection2) => collection2.name === TEMPLATE_VARIABLE_COLLECTION_NAME
-      );
-      if (collection) {
-        const libraryVariables =
-          await figma.teamLibrary.getVariablesInLibraryCollectionAsync(
-            collection.key
-          );
-        const variableTemplates = await atob(libraryVariables[0].name);
-        if (variableTemplates) {
-          const json = JSON.parse(variableTemplates);
-          templates.types = json.types;
-        }
-      }
+      return libraryVariables[0].name || null;
     }
-    return templates;
+    return null;
   }
   async function loadTemplatesFromPage() {
-    const templates = (await getGlobalTemplatesFromClientStorage()) || {};
+    const templates = {};
     templates.types = {};
     figma.currentPage.children.forEach((node) => {
       const result = getCodegenResultsFromPluginData(node);
@@ -901,10 +711,7 @@ ${indent}`)
         templates.types[node.name] = result;
       }
     });
-    if (
-      Object.keys(templates.components || {}).length ||
-      Object.keys(templates.types).length
-    ) {
+    if (Object.keys(templates.components || {}).length || Object.keys(templates.types).length) {
       return templates;
     } else {
       return null;
@@ -914,22 +721,14 @@ ${indent}`)
     const templates = await figma.clientStorage.getAsync(
       CLIENT_STORAGE_GLOBAL_TEMPLATES_KEY
     );
-    return templates && templatesIsCodeSnippetGlobalTemplates(templates)
-      ? templates
-      : null;
+    return templates && templatesIsCodeSnippetGlobalTemplates(templates) ? templates : null;
   }
   async function setGlobalTemplatesInTeamLibrary(templatesEncodedString) {
     const collections = figma.variables.getLocalVariableCollections();
-    const collection =
-      collections.find(
-        (collection2) => collection2.name === TEMPLATE_VARIABLE_COLLECTION_NAME
-      ) ||
-      figma.variables.createVariableCollection(
-        TEMPLATE_VARIABLE_COLLECTION_NAME
-      );
-    const variable = collection.variableIds.length
-      ? figma.variables.getVariableById(collection.variableIds[0])
-      : null;
+    const collection = collections.find(
+      (collection2) => collection2.name === TEMPLATE_VARIABLE_COLLECTION_NAME
+    ) || figma.variables.createVariableCollection(TEMPLATE_VARIABLE_COLLECTION_NAME);
+    const variable = collection.variableIds.length ? figma.variables.getVariableById(collection.variableIds[0]) : null;
     if (variable) {
       variable.name = templatesEncodedString;
     } else {
@@ -950,77 +749,92 @@ ${indent}`)
   }
 
   // src/code.ts
+  initializeUIMessageHandler();
   if (figma.mode === "codegen") {
     initializeCodegenMode();
   } else {
-    initializeDesignMode();
+    openGlobalTemplateUI();
+  }
+  function initializeUIMessageHandler() {
+    figma.ui.on(
+      "message",
+      async (event) => {
+        switch (event.type) {
+          case "EDITOR_INITIALIZE":
+            handleCurrentSelection();
+            break;
+          case "EDITOR_SAVE":
+            setCodegenResultsInPluginData(
+              figma.currentPage.selection[0],
+              event.data
+            );
+            figma.notify("Saved to node!");
+            break;
+          case "TEMPLATES_SAVE":
+            if (event.saveToTeamLibrary && event.dataEncodedString) {
+              setGlobalTemplatesInTeamLibrary(event.dataEncodedString);
+              figma.notify("Saved to team library!");
+            } else {
+              setGlobalTemplatesInClientStorage(event.data);
+              figma.notify("Saved to client storage!");
+            }
+            const message = { type: "TEMPLATES_SAVE_RESULT" };
+            figma.ui.postMessage(message);
+            break;
+          case "TEMPLATES_LOAD":
+            if (event.loadFromTeamLibrary) {
+              const templates = await getEncodedGlobalTemplatesFromTeamLibrary();
+              const message2 = {
+                type: "TEMPLATES_LOAD_TEAM_LIBRARY_RESULT",
+                templates
+              };
+              figma.ui.postMessage(message2);
+              if (!templates) {
+                figma.notify("No templates defined in team library");
+              }
+            } else {
+              const templates = await loadTemplatesFromPage();
+              const message2 = {
+                type: "TEMPLATES_LOAD_PAGE_RESULT",
+                templates
+              };
+              figma.ui.postMessage(message2);
+              if (!templates) {
+                figma.notify("No templates defined on this page");
+              }
+            }
+            break;
+          default:
+            console.log("UNKNOWN EVENT", event);
+        }
+      }
+    );
   }
   async function initializeCodegenMode() {
     figma.codegen.on("preferenceschange", async (event) => {
       if (event.propertyName === "editor") {
         openCodeSnippetEditorUI();
       } else if (event.propertyName === "templates") {
-        openTemplateUI();
-      }
-    });
-    figma.ui.on("message", async (event) => {
-      if (event.type === "EDITOR_INITIALIZE") {
-        handleCurrentSelection();
-      } else if (event.type === "EDITOR_SAVE") {
-        setCodegenResultsInPluginData(
-          figma.currentPage.selection[0],
-          event.data
-        );
-        figma.notify("Saved to node!");
-      } else if (event.type === "TEMPLATES_DATA") {
-        if (event.saveToTeamLibrary && event.dataEncodedString) {
-          setGlobalTemplatesInTeamLibrary(event.dataEncodedString);
-          figma.notify("Saved to team library!");
-        } else {
-          setGlobalTemplatesInClientStorage(event.data);
-          figma.notify("Saved to client storage!");
-        }
-      } else if (event.type === "TEMPLATES_LOAD") {
-        const templates = await loadTemplatesFromPage();
-        if (templates) {
-          const message = {
-            type: "TEMPLATES_INITIALIZE",
-            templates,
-            enableTeamLibraries: false,
-          };
-          figma.ui.postMessage(message);
-        } else {
-          figma.notify("No templates defined on this page");
-        }
-      } else if (
-        event.type === "TEMPLATES_ATOB" ||
-        event.type === "TEMPLATES_BTOA"
-      ) {
-      } else {
-        console.log("UNKNOWN EVENT", event);
+        openGlobalTemplateUI();
       }
     });
     figma.on("selectionchange", () => handleCurrentSelection);
     figma.codegen.on("generate", async () => {
       try {
-        const { detailsMode, defaultSnippet, useTeamLibraries } =
-          figma.codegen.preferences.customSettings;
+        const { detailsMode, defaultSnippet } = figma.codegen.preferences.customSettings;
         const isDetailsMode = detailsMode === "on";
         const hasDefaultMessage = defaultSnippet === "message";
-        const isUsingTeamLibraries = useTeamLibraries === "on";
         const currentNode = handleCurrentSelection();
-        const templates =
-          (await getGlobalTemplates(isUsingTeamLibraries)) || {};
+        const templates = await getGlobalTemplatesFromClientStorage() || {};
         const recursiveParamsMap = await recursiveParamsFromNode(
           currentNode,
           templates
         );
-        const nodeSnippetTemplateDataArray =
-          await nodeSnippetTemplateDataArrayFromNode(
-            currentNode,
-            recursiveParamsMap,
-            templates
-          );
+        const nodeSnippetTemplateDataArray = await nodeSnippetTemplateDataArrayFromNode(
+          currentNode,
+          recursiveParamsMap,
+          templates
+        );
         const snippets = codegenResultsFromNodeSnippetTemplateDataArray(
           nodeSnippetTemplateDataArray,
           isDetailsMode
@@ -1029,14 +843,14 @@ ${indent}`)
           snippets.push({
             title: "Params",
             code: JSON.stringify(recursiveParamsMap, null, 2),
-            language: "JSON",
+            language: "JSON"
           });
         }
         if (!snippets.length && hasDefaultMessage) {
           snippets.push({
             title: "Snippets",
             code: "No snippets on this node. Add snippets via the Snippet Editor.",
-            language: "PLAINTEXT",
+            language: "PLAINTEXT"
           });
         }
         return snippets;
@@ -1046,56 +860,13 @@ ${indent}`)
           {
             language: "PLAINTEXT",
             code: typeof e === "string" ? e : `${e}`,
-            title: "Error",
-          },
+            title: "Error"
+          }
         ];
       }
     });
   }
-  function initializeDesignMode() {
-    if (figma.command === "global") {
-      figma.ui.on("message", async (event) => {
-        if (event.type === "TEMPLATES_DATA") {
-          if (event.saveToTeamLibrary && event.dataEncodedString) {
-            setGlobalTemplatesInTeamLibrary(event.dataEncodedString);
-            figma.notify("Saved to team library!");
-          } else {
-            setGlobalTemplatesInClientStorage(event.data);
-            figma.notify("Saved to client storage!");
-          }
-        } else if (event.type === "TEMPLATES_LOAD") {
-          const templates = await loadTemplatesFromPage();
-          if (templates) {
-            const message = {
-              type: "TEMPLATES_INITIALIZE",
-              templates,
-              enableTeamLibraries: false,
-            };
-            figma.ui.postMessage(message);
-          } else {
-            figma.notify("No templates defined on this page");
-          }
-        }
-      });
-      openTemplateUI();
-    } else if (figma.command === "bulk") {
-      figma.ui.on("message", async (event) => {
-        if (event.type === "BULK_INITIALIZE") {
-          handleCurrentSelection();
-        } else if (event.type === "BULK_EXPORT") {
-          bulk.performExport();
-        } else if (event.type === "BULK_IMPORT") {
-          bulk.performImport(event.data);
-        }
-      });
-      figma.showUI(__uiFiles__.bulk, {
-        width: 600,
-        height: 600,
-        themeColors: true,
-      });
-    }
-  }
-  function openCodeSnippetEditorUI() {
+  async function openCodeSnippetEditorUI() {
     const { x, y, width, height } = figma.viewport.bounds;
     const absWidth = width * figma.viewport.zoom;
     const absHeight = height * figma.viewport.zoom;
@@ -1108,33 +879,34 @@ ${indent}`)
       position: { x: realX, y },
       width: finalWidth,
       height: finalHeight,
-      themeColors: true,
+      themeColors: true
     });
   }
-  async function openTemplateUI() {
-    const { useTeamLibraries } = figma.codegen.preferences.customSettings;
-    const isUsingTeamLibraries = useTeamLibraries === "on";
+  async function openGlobalTemplateUI() {
     figma.showUI(__uiFiles__.templates, {
       width: 600,
       height: 600,
-      themeColors: true,
+      themeColors: true
     });
-    const templates = (await getGlobalTemplates(isUsingTeamLibraries)) || {};
+    const templates = await getGlobalTemplatesFromClientStorage() || {};
+    sendTemplatesInitializeMessage(templates);
+  }
+  async function sendTemplatesInitializeMessage(templates) {
+    const hasLibraryTemplates = Boolean(
+      await getEncodedGlobalTemplatesFromTeamLibrary()
+    );
     const message = {
       type: "TEMPLATES_INITIALIZE",
       templates,
-      enableTeamLibraries: figma.editorType === "figma" && isUsingTeamLibraries,
+      hasLibraryTemplates,
+      editorType: figma.editorType
     };
     figma.ui.postMessage(message);
   }
-  function codegenResultsFromNodeSnippetTemplateDataArray(
-    nodeSnippetTemplateDataArray,
-    isDetailsMode
-  ) {
+  function codegenResultsFromNodeSnippetTemplateDataArray(nodeSnippetTemplateDataArray, isDetailsMode) {
     const codegenResult = [];
     nodeSnippetTemplateDataArray.forEach((nodeSnippetTemplateData) => {
-      const { codegenResultArray, codegenResultRawTemplatesArray } =
-        nodeSnippetTemplateData;
+      const { codegenResultArray, codegenResultRawTemplatesArray } = nodeSnippetTemplateData;
       if (isDetailsMode) {
         codegenResultArray.forEach((result, i) => {
           codegenResult.push(codegenResultRawTemplatesArray[i]);
@@ -1149,16 +921,14 @@ ${indent}`)
   function handleCurrentSelection() {
     const node = figma.currentPage.selection[0];
     try {
-      const nodePluginData = node
-        ? getCodegenResultsFromPluginData(node)
-        : null;
+      const nodePluginData = node ? getCodegenResultsFromPluginData(node) : null;
       const nodeId = node ? node.id : null;
       const nodeType = node ? node.type : null;
       const message = {
         type: "EDITOR_SELECTION",
         nodeId,
         nodeType,
-        nodePluginData,
+        nodePluginData
       };
       figma.ui.postMessage(message);
       return node;

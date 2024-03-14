@@ -23,67 +23,23 @@ function templatesIsCodeSnippetGlobalTemplates(
 }
 
 /**
- * Decoding a base64 encoded string through an invisible iframe
- * @param string the string to decode
- * @returns decoded string
+ * Get the encoded global templates object from a team library variable collection
+ * @returns a the encoded global templates string (if it exists) or null
  */
-function atob(string: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    figma.ui.on("message", (e) =>
-      e.type === "TEMPLATES_ATOB" ? resolve(e.data) : null
-    );
-    figma.showUI(
-      `<script>parent.postMessage({ pluginMessage: { type: "TEMPLATES_ATOB", data: atob("${string}") } }, "*");</script>`,
-      { visible: false }
-    );
-  });
-}
-
-/**
- * Encoding a base64 string through an invisible iframe
- * @param string the string to encode
- * @returns encoded string
- */
-function btoa(string: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    figma.ui.on("message", (e) =>
-      e.type === "TEMPLATES_BTOA" ? resolve(e.data) : null
-    );
-    figma.showUI(
-      `<script>parent.postMessage({ pluginMessage: { type: "TEMPLATES_BTOA", data: btoa("${string}") } }, "*");</script>`,
-      { visible: false }
-    );
-  });
-}
-
-/**
- * Getting a global templates object from client storage, and optionally overriding with team libraries
- * @param useTeamLibraries whether or not to check team libraries for templates
- * @returns Promise resolving CodeSnippetGlobalTemplates
- */
-export async function getGlobalTemplates(
-  useTeamLibraries: boolean
-): Promise<CodeSnippetGlobalTemplates> {
-  const templates = (await getGlobalTemplatesFromClientStorage()) || {};
-  if (useTeamLibraries) {
-    const collectionsFromTeamLibraries =
-      await figma.teamLibrary.getAvailableLibraryVariableCollectionsAsync();
-    const collection = collectionsFromTeamLibraries.find(
-      (collection) => collection.name === TEMPLATE_VARIABLE_COLLECTION_NAME
-    );
-    if (collection) {
-      const libraryVariables =
-        await figma.teamLibrary.getVariablesInLibraryCollectionAsync(
-          collection.key
-        );
-      const variableTemplates = await atob(libraryVariables[0].name);
-      if (variableTemplates) {
-        const json = JSON.parse(variableTemplates);
-        templates.types = json.types;
-      }
-    }
+export async function getEncodedGlobalTemplatesFromTeamLibrary() {
+  const collectionsFromTeamLibraries =
+    await figma.teamLibrary.getAvailableLibraryVariableCollectionsAsync();
+  const collection = collectionsFromTeamLibraries.find(
+    (collection) => collection.name === TEMPLATE_VARIABLE_COLLECTION_NAME
+  );
+  if (collection) {
+    const libraryVariables =
+      await figma.teamLibrary.getVariablesInLibraryCollectionAsync(
+        collection.key
+      );
+    return libraryVariables[0].name || null;
   }
-  return templates;
+  return null;
 }
 
 /**
@@ -92,7 +48,7 @@ export async function getGlobalTemplates(
  * @returns Promise resolving CodeSnippetGlobalTemplates object or null
  */
 export async function loadTemplatesFromPage(): Promise<CodeSnippetGlobalTemplates | null> {
-  const templates = (await getGlobalTemplatesFromClientStorage()) || {};
+  const templates: CodeSnippetGlobalTemplates = {};
   templates.types = {};
   figma.currentPage.children.forEach((node) => {
     const result = getCodegenResultsFromPluginData(node);
@@ -115,7 +71,7 @@ export async function loadTemplatesFromPage(): Promise<CodeSnippetGlobalTemplate
  * https://www.figma.com/plugin-docs/api/figma-clientStorage
  * @returns Promise resolving CodeSnippetGlobalTemplates object or null
  */
-async function getGlobalTemplatesFromClientStorage(): Promise<CodeSnippetGlobalTemplates | null> {
+export async function getGlobalTemplatesFromClientStorage(): Promise<CodeSnippetGlobalTemplates | null> {
   const templates = await figma.clientStorage.getAsync(
     CLIENT_STORAGE_GLOBAL_TEMPLATES_KEY
   );

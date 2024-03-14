@@ -22,9 +22,11 @@ Translate component variants, properties, and more into dynamic code snippets fo
   - [`property`](#property)
   - [`variables`](#variables)
 - [Filters](#filters)
-- [Global Templates](#global-templates)
 - [“Details mode”](#details-mode)
-- [Bulk Operations](#bulk-operations)
+- [Global Templates](#global-templates)
+  - [Load from page](#load-from-page)
+  - [Save to Team Library](#save-to-team-library)
+  - [Load from Team Library](#load-from-team-library)
 - [Full Examples](#full-examples)
   - [React](#react)
   - [HTML/CSS](#htmlcss)
@@ -396,6 +398,14 @@ figma-is-great
 FIGMA_IS_GREAT
 ```
 
+## “Details Mode”
+
+Details mode can be enabled from the plugin settings menu.
+
+In addition to the current snippets, it will display any templates being referenced, as well as JSON view of all the [params](#params) available for the current selection.
+
+Details mode is really useful when you’re building or debuigging your templates!
+
 ## Global Templates
 
 Templates can also be stored in Figma's [clientStorage](https://www.figma.com/plugin-docs/api/figma-clientStorage/). This is the only way to store templates for non-component nodes in a way that all nodes can inherit them.
@@ -425,6 +435,8 @@ These templates are stored in an object with the following schema:
 }
 ```
 
+`"types"` can contain any valid Figma node type ("FRAME", "COMPONENT", "TEXT", "RECTANGLE", etc).
+
 Check out [./src/index.d.ts](./src/index.d.ts) for documentation on the `CodeSnippetGlobalTemplates` type.
 
 See [./examples.json](./examples.json) for real world examples.
@@ -437,54 +449,19 @@ Syncing this JSON exernally is on the roadmap, but for now, the only way to add 
 
 ![Global Template Editor UI](https://github.com/figma/code-snippet-editor-plugin/assets/97200987/09d04b40-59f7-43c4-b878-40b319e98c23)
 
-## “Details Mode”
+### Load from page
 
-Details mode can be enabled from the plugin settings menu.
+You can load global templates from the current page. Create nodes at the root of a page, where their name is the node type ("FRAME", "TEXT", etc). If you add templates to those nodes, they will be found when you click "Load from page"
 
-In addition to the current snippets, it will display any templates being referenced, as well as JSON view of all the [params](#params) available for the current selection.
+### Save to Team Library
 
-Details mode is really useful when you’re building or debuigging your templates!
+Running the plugin in design mode will open a window allowing you to save global templates to a team library. The way that this is achieved is quite a hack, so tread carefully.
 
-## Bulk Operations
+There is no plugin storage for team libraries, so this plugin saves the global templates encoded in a Figma variable name in a custom variable collection. This collection can then be published to teams (and enabled by default on all new files) by the user.
 
-Running the plugin in design mode will open a window allowing you to perform bulk operations.
+### Load from Team Library
 
-You can bulk export and import templates for the current file (currently only available for components and component sets).
-
-The JSON schema for import and export is:
-
-```ts
-type Templates = {
-  [k: ComponentKey]: Array<{
-    language: CodegenResultLanguage;
-    code: string;
-    title: string;
-  }>;
-};
-```
-
-> More info: [CodegenResult languages](https://www.figma.com/plugin-docs/api/CodegenResult/), [Component key](https://www.figma.com/plugin-docs/api/ComponentNode/#key)
-
-As an example:
-
-```json
-{
-  "componentKeyABC123": [
-    {
-      "language": "JAVASCRIPT",
-      "code": "<Button\n  {{?property.state = disabled}}disabled\n  variant=\"{{property.variant}}\"\n  {{?property.iconStart.b=true}}iconStart={<{{property.iconStart.i|pascal}} />}\n  {{?property.iconEnd.b=true}}iconEnd={<{{property.iconEnd.i|pascal}} />}\n  onClick={() => {}}\n>\n  {{property.label|raw}}\n</Button>",
-      "title": "My Special Template"
-    }
-  ],
-  "componentKeyDEF456": []
-}
-```
-
-When importing, if the component key is present in the current file, its templates will be overwritten.
-
-Importing an empty array for a component key will remove all snippets for that component.
-
-Components whose keys are not definied in the JSON are not effected by an import, even if they have snippets defined in Figma.
+Currently, users must open the Global Templates Editor and explicitly "Load from library" then "Save to client storage." This could be loaded automatically, but due to the hacky nature of this, I am making it fairly explicit to opt into for now. Any changes to the library must explicitly be brought in the same way by users (Load from library -> Save to client storage).
 
 ## Full Examples
 

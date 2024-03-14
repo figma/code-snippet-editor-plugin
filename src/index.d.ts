@@ -112,41 +112,26 @@ type EventToEditor = {
  * Events coming in from the templates.html ui
  */
 type EventFromTemplates =
-  | { type: "TEMPLATES_LOAD" | "TEMPLATES_ATOB" | "TEMPLATES_BTOA" }
-  | EventFromTemplatesData;
-type EventFromTemplatesData = {
-  type: "TEMPLATES_DATA";
-  data: CodeSnippetGlobalTemplates;
-  dataEncodedString?: string;
-  saveToTeamLibrary?: boolean;
-};
+  | { type: "TEMPLATES_LOAD"; loadFromTeamLibrary?: boolean }
+  | {
+      type: "TEMPLATES_SAVE";
+      data: CodeSnippetGlobalTemplates;
+      dataEncodedString?: string;
+      saveToTeamLibrary?: boolean;
+    };
 /**
  * Events sending to the tempaltes.html ui
  */
-type EventToTemplates = {
-  type: "TEMPLATES_INITIALIZE";
-  templates: CodeSnippetGlobalTemplates | {};
-  enableTeamLibraries: boolean;
-};
-
-/**
- * Events coming in from the bulk.html ui
- */
-type EventFromBulk =
+type EventToTemplates =
   | {
-      type: "BULK_INITIALIZE" | "BULK_EXPORT";
+      type: "TEMPLATES_INITIALIZE";
+      templates: CodeSnippetGlobalTemplates | {};
+      editorType: "figma" | "dev" | "figjam";
+      hasLibraryTemplates: boolean;
     }
-  | EventFromBulkImport;
-
-type EventFromBulkImport = {
-  type: "BULK_IMPORT";
-  data: CodegenResultTemplatesByComponentKey;
-};
-
-/**
- * Events sending to the bulk.html ui
- */
-type EventToBulk = {
-  type: "BULK_EXPORT";
-  code: string;
-};
+  | { type: "TEMPLATES_LOAD_TEAM_LIBRARY_RESULT"; templates: string | null }
+  | {
+      type: "TEMPLATES_LOAD_PAGE_RESULT";
+      templates: CodeSnippetGlobalTemplates | null;
+    }
+  | { type: "TEMPLATES_SAVE_RESULT" };

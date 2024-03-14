@@ -34,30 +34,10 @@
         { "label": "On", "value": "on" },
         { "label": "Off", "value": "off", "isDefault": true }
       ]
-    },
-    {
-      "itemType": "select",
-      "propertyName": "useTeamLibraries",
-      "label": "Use team libraries for global templates (beta)",
-      "options": [
-        { "label": "On", "value": "on" },
-        { "label": "Off", "value": "off", "isDefault": true }
-      ]
-    }
-  ],
-  "menu": [
-    {
-      "name": "Bulk operations",
-      "command": "bulk"
-    },
-    {
-      "name": "Global templates",
-      "command": "global"
     }
   ],
   "main": "code.js",
   "ui": {
-    "bulk": "ui/bulk.html",
     "editor": "ui/editor.html",
     "templates": "ui/templates.html"
   },

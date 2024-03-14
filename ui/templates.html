@@ -48,6 +48,9 @@
       button:hover {
         background-color: var(--figma-color-bg-brand-hover);
       }
+      button:disabled {
+        opacity: 0.2;
+      }
       textarea {
         background: var(--figma-color-bg-secondary);
         border-radius: 2px;
@@ -74,43 +77,107 @@
         <button id="save">Save to client storage</button>
         <button style="display: none" id="save-library">Save to library</button>
         <button id="load">Load from page</button>
+        <button style="display: none" id="load-library">
+          Load from library
+        </button>
       </div>
     </main>
     <script>
       const textarea = document.querySelector("textarea");
+      const saveButton = document.getElementById("save");
+      const saveLibraryButton = document.getElementById("save-library");
+      const loadButton = document.getElementById("load");
+      const loadLibraryButton = document.getElementById("load-library");
       window.onmessage = (e) => {
         const data = e.data.pluginMessage;
         if (data.type === "TEMPLATES_INITIALIZE") {
           textarea.value = JSON.stringify(data.templates, null, 2);
-          const button = document.getElementById("save-library");
-          if (data.enableTeamLibraries && button) {
-            if (button) {
-              button.style.display = "initial";
-              button.addEventListener("click", () => {
-                const data = validData();
-                parent.postMessage(
-                  {
-                    pluginMessage: {
-                      type: "TEMPLATES_DATA",
-                      data,
-                      dataEncodedString: btoa(JSON.stringify(data)),
-                      saveToTeamLibrary: true,
-                    },
-                  },
-                  "*"
-                );
-              });
-            }
+          if (data.editorType === "figma" && saveLibraryButton) {
+            initializeSaveLibraryButton();
           }
+          if (data.hasLibraryTemplates) {
+            initializeLoadLibraryButton();
+          }
+        } else if (data.type === "TEMPLATES_LOAD_TEAM_LIBRARY_RESULT") {
+          enableButtons();
+          if (data.templates) {
+            textarea.value = JSON.stringify(
+              JSON.parse(atob(data.templates)),
+              null,
+              2
+            );
+            validData();
+          }
+        } else if (data.type === "TEMPLATES_LOAD_PAGE_RESULT") {
+          enableButtons();
+          if (data.templates) {
+            textarea.value = JSON.stringify(data.templates, null, 2);
+            validData();
+          }
+        } else if (data.type === "TEMPLATES_SAVE_RESULT") {
+          enableButtons();
         }
       };
-      document.getElementById("load").addEventListener("click", () => {
+
+      function initializeSaveLibraryButton() {
+        saveLibraryButton.style.display = "initial";
+        saveLibraryButton.addEventListener("click", () => {
+          disableButtons();
+          const data = validData();
+          parent.postMessage(
+            {
+              pluginMessage: {
+                type: "TEMPLATES_SAVE",
+                data,
+                dataEncodedString: btoa(JSON.stringify(data)),
+                saveToTeamLibrary: true,
+              },
+            },
+            "*"
+          );
+        });
+      }
+
+      function initializeLoadLibraryButton() {
+        loadLibraryButton.style.display = "initial";
+        loadLibraryButton.addEventListener("click", () => {
+          disableButtons();
+          parent.postMessage(
+            {
+              pluginMessage: {
+                type: "TEMPLATES_LOAD",
+                loadFromTeamLibrary: true,
+              },
+            },
+            "*"
+          );
+        });
+      }
+
+      function disableButtons() {
+        saveLibraryButton.setAttribute("disabled", "true");
+        loadLibraryButton.setAttribute("disabled", "true");
+        saveButton.setAttribute("disabled", "true");
+        loadButton.setAttribute("disabled", "true");
+      }
+
+      function enableButtons() {
+        saveLibraryButton.removeAttribute("disabled");
+        loadLibraryButton.removeAttribute("disabled");
+        saveButton.removeAttribute("disabled");
+        loadButton.removeAttribute("disabled");
+      }
+
+      loadButton.addEventListener("click", () => {
+        disableButtons();
         parent.postMessage({ pluginMessage: { type: "TEMPLATES_LOAD" } }, "*");
       });
-      document.getElementById("save").addEventListener("click", () => {
+
+      saveButton.addEventListener("click", () => {
+        disableButtons();
         const data = validData();
         parent.postMessage(
-          { pluginMessage: { type: "TEMPLATES_DATA", data } },
+          { pluginMessage: { type: "TEMPLATES_SAVE", data } },
           "*"
         );
       });

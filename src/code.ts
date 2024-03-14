@@ -1,4 +1,3 @@
-import { bulk } from "./bulk";
 import {
   getCodegenResultsFromPluginData,
   setCodegenResultsInPluginData,
@@ -6,16 +5,75 @@ import {
 import { recursiveParamsFromNode } from "./params";
 import { nodeSnippetTemplateDataArrayFromNode } from "./snippets";
 import {
-  getGlobalTemplates,
+  getGlobalTemplatesFromClientStorage,
+  getEncodedGlobalTemplatesFromTeamLibrary,
   setGlobalTemplatesInClientStorage,
   setGlobalTemplatesInTeamLibrary,
   loadTemplatesFromPage,
 } from "./templates";
 
+initializeUIMessageHandler();
+
 if (figma.mode === "codegen") {
   initializeCodegenMode();
 } else {
-  initializeDesignMode();
+  openGlobalTemplateUI();
+}
+
+function initializeUIMessageHandler() {
+  figma.ui.on(
+    "message",
+    async (event: EventFromEditor | EventFromTemplates) => {
+      switch (event.type) {
+        case "EDITOR_INITIALIZE":
+          handleCurrentSelection();
+          break;
+        case "EDITOR_SAVE":
+          setCodegenResultsInPluginData(
+            figma.currentPage.selection[0],
+            event.data
+          );
+          figma.notify("Saved to node!");
+          break;
+        case "TEMPLATES_SAVE":
+          if (event.saveToTeamLibrary && event.dataEncodedString) {
+            setGlobalTemplatesInTeamLibrary(event.dataEncodedString);
+            figma.notify("Saved to team library!");
+          } else {
+            setGlobalTemplatesInClientStorage(event.data);
+            figma.notify("Saved to client storage!");
+          }
+          const message: EventToTemplates = { type: "TEMPLATES_SAVE_RESULT" };
+          figma.ui.postMessage(message);
+          break;
+        case "TEMPLATES_LOAD":
+          if (event.loadFromTeamLibrary) {
+            const templates = await getEncodedGlobalTemplatesFromTeamLibrary();
+            const message: EventToTemplates = {
+              type: "TEMPLATES_LOAD_TEAM_LIBRARY_RESULT",
+              templates,
+            };
+            figma.ui.postMessage(message);
+            if (!templates) {
+              figma.notify("No templates defined in team library");
+            }
+          } else {
+            const templates = await loadTemplatesFromPage();
+            const message: EventToTemplates = {
+              type: "TEMPLATES_LOAD_PAGE_RESULT",
+              templates,
+            };
+            figma.ui.postMessage(message);
+            if (!templates) {
+              figma.notify("No templates defined on this page");
+            }
+          }
+          break;
+        default:
+          console.log("UNKNOWN EVENT", event);
+      }
+    }
+  );
 }
 
 /**
@@ -32,56 +90,9 @@ async function initializeCodegenMode() {
     if (event.propertyName === "editor") {
       openCodeSnippetEditorUI();
     } else if (event.propertyName === "templates") {
-      openTemplateUI();
+      openGlobalTemplateUI();
     }
   });
-
-  /**
-   * Whenever we receive a message from the UI in codegen mode, it is either:
-   *  - INITIALIZE: requesting initial data about the current selection when it opens
-   *  - SAVE: providing template data for the plugin to save on the current selection
-   */
-  figma.ui.on(
-    "message",
-    async (event: EventFromEditor | EventFromTemplates) => {
-      if (event.type === "EDITOR_INITIALIZE") {
-        handleCurrentSelection();
-      } else if (event.type === "EDITOR_SAVE") {
-        setCodegenResultsInPluginData(
-          figma.currentPage.selection[0],
-          event.data
-        );
-        figma.notify("Saved to node!");
-      } else if (event.type === "TEMPLATES_DATA") {
-        if (event.saveToTeamLibrary && event.dataEncodedString) {
-          setGlobalTemplatesInTeamLibrary(event.dataEncodedString);
-          figma.notify("Saved to team library!");
-        } else {
-          setGlobalTemplatesInClientStorage(event.data);
-          figma.notify("Saved to client storage!");
-        }
-      } else if (event.type === "TEMPLATES_LOAD") {
-        const templates = await loadTemplatesFromPage();
-        if (templates) {
-          const message: EventToTemplates = {
-            type: "TEMPLATES_INITIALIZE",
-            templates,
-            enableTeamLibraries: false,
-          };
-          figma.ui.postMessage(message);
-        } else {
-          figma.notify("No templates defined on this page");
-        }
-      } else if (
-        event.type === "TEMPLATES_ATOB" ||
-        event.type === "TEMPLATES_BTOA"
-      ) {
-        // nothing
-      } else {
-        console.log("UNKNOWN EVENT", event);
-      }
-    }
-  );
 
   /**
    * When the selection changes we want to rerun the code that handles a new node.
@@ -98,14 +109,13 @@ async function initializeCodegenMode() {
        *   what to render when there is no template to render.
        * https://github.com/figma/code-snippet-editor-plugin#details-mode
        */
-      const { detailsMode, defaultSnippet, useTeamLibraries } =
+      const { detailsMode, defaultSnippet } =
         figma.codegen.preferences.customSettings;
       const isDetailsMode = detailsMode === "on";
       const hasDefaultMessage = defaultSnippet === "message";
-      const isUsingTeamLibraries = useTeamLibraries === "on";
       const currentNode = handleCurrentSelection();
 
-      const templates = (await getGlobalTemplates(isUsingTeamLibraries)) || {};
+      const templates = (await getGlobalTemplatesFromClientStorage()) || {};
       const recursiveParamsMap = await recursiveParamsFromNode(
         currentNode,
         templates
@@ -161,58 +171,10 @@ async function initializeCodegenMode() {
 }
 
 /**
- * Running in design mode, we can perform bulk operations like import/export from JSON
- *   and helpers for loading node data and component data.
- */
-function initializeDesignMode() {
-  if (figma.command === "global") {
-    figma.ui.on("message", async (event: EventFromTemplates) => {
-      if (event.type === "TEMPLATES_DATA") {
-        if (event.saveToTeamLibrary && event.dataEncodedString) {
-          setGlobalTemplatesInTeamLibrary(event.dataEncodedString);
-          figma.notify("Saved to team library!");
-        } else {
-          setGlobalTemplatesInClientStorage(event.data);
-          figma.notify("Saved to client storage!");
-        }
-      } else if (event.type === "TEMPLATES_LOAD") {
-        const templates = await loadTemplatesFromPage();
-        if (templates) {
-          const message: EventToTemplates = {
-            type: "TEMPLATES_INITIALIZE",
-            templates,
-            enableTeamLibraries: false,
-          };
-          figma.ui.postMessage(message);
-        } else {
-          figma.notify("No templates defined on this page");
-        }
-      }
-    });
-    openTemplateUI();
-  } else if (figma.command === "bulk") {
-    figma.ui.on("message", async (event: EventFromBulk) => {
-      if (event.type === "BULK_INITIALIZE") {
-        handleCurrentSelection();
-      } else if (event.type === "BULK_EXPORT") {
-        bulk.performExport();
-      } else if (event.type === "BULK_IMPORT") {
-        bulk.performImport(event.data);
-      }
-    });
-    figma.showUI(__uiFiles__.bulk, {
-      width: 600,
-      height: 600,
-      themeColors: true,
-    });
-  }
-}
-
-/**
  * This attempts to open the editor UI in a large, but unobtrusive way.
  * Real important math right here (jk, totally arbitrary).
  */
-function openCodeSnippetEditorUI() {
+async function openCodeSnippetEditorUI() {
   const { x, y, width, height } = figma.viewport.bounds;
   const absWidth = width * figma.viewport.zoom;
   const absHeight = height * figma.viewport.zoom;
@@ -229,21 +191,33 @@ function openCodeSnippetEditorUI() {
   });
 }
 /**
- * Opening the UI for templates and sending a message with the initial template data
+ * Opening the UI for global templates and sending a message with the initial template data
  */
-async function openTemplateUI() {
-  const { useTeamLibraries } = figma.codegen.preferences.customSettings;
-  const isUsingTeamLibraries = useTeamLibraries === "on";
+async function openGlobalTemplateUI() {
   figma.showUI(__uiFiles__.templates, {
     width: 600,
     height: 600,
     themeColors: true,
   });
-  const templates = (await getGlobalTemplates(isUsingTeamLibraries)) || {};
+  const templates = (await getGlobalTemplatesFromClientStorage()) || {};
+  sendTemplatesInitializeMessage(templates);
+}
+
+/**
+ * Send the initialize message to the ui with templates, and indicator if library templates are available.
+ * @param templates
+ */
+async function sendTemplatesInitializeMessage(
+  templates: CodeSnippetGlobalTemplates
+) {
+  const hasLibraryTemplates = Boolean(
+    await getEncodedGlobalTemplatesFromTeamLibrary()
+  );
   const message: EventToTemplates = {
     type: "TEMPLATES_INITIALIZE",
     templates,
-    enableTeamLibraries: figma.editorType === "figma" && isUsingTeamLibraries,
+    hasLibraryTemplates,
+    editorType: figma.editorType,
   };
   figma.ui.postMessage(message);
 }
