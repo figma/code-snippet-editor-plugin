@@ -182,12 +182,12 @@
       const componentTemplates = "key" in snippetNode ? globalTemplates.components[snippetNode.key] || [] : [];
       codegenResultTemplates.push(...matchingTemplates(componentTemplates));
     }
-    if (!Object.keys(seenSnippetTemplates).length && !codegenResultTemplates.length && globalTemplates.types) {
+    if (globalTemplates.types) {
       const typeTemplates = globalTemplates.types[snippetNode.type] || [];
       const seenKey = JSON.stringify(typeTemplates);
+      const defaultTemplates = !typeTemplates.length && !Object.keys(seenSnippetTemplates).length && !codegenResultTemplates.length && globalTemplates.types.DEFAULT ? globalTemplates.types.DEFAULT : [];
       if (!seenSnippetTemplates[seenKey]) {
         seenSnippetTemplates[seenKey] = 1;
-        const defaultTemplates = !typeTemplates.length && globalTemplates.types.DEFAULT ? globalTemplates.types.DEFAULT : [];
         codegenResultTemplates.push(...matchingTemplates(typeTemplates));
         codegenResultTemplates.push(...matchingTemplates(defaultTemplates));
       }
