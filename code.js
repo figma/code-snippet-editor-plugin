@@ -614,17 +614,12 @@ ${indent}`);
           if (!Array.isArray(vars)) {
             vars = [vars];
           }
-          const doIndexes = vars.length > 1;
           vars.forEach((v, i) => {
             const va = figma.variables.getVariableById(v.id);
             if (va) {
               if (i === 0) {
                 paramsRaw[`variables.${key}`] = va.name;
                 params[`variables.${key}`] = safeString(va.name);
-              }
-              if (doIndexes) {
-                paramsRaw[`variables.${key}.${i}`] = va.name;
-                params[`variables.${key}.${i}`] = safeString(va.name);
               }
               for (let syntax in va.codeSyntax) {
                 const syntaxKey = syntax.charAt(0).toLowerCase();
@@ -635,12 +630,12 @@ ${indent}`);
                     paramsRaw[`variables.${key}.${syntaxKey}`] = value;
                     params[`variables.${key}.${syntaxKey}`] = safeString(value);
                   }
-                  if (doIndexes) {
-                    paramsRaw[`variables.${key}.${i}.${syntaxKey}`] = value;
-                    params[`variables.${key}.${i}.${syntaxKey}`] = safeString(value);
-                  }
+                  paramsRaw[`variables.${key}.${i}.${syntaxKey}`] = value;
+                  params[`variables.${key}.${i}.${syntaxKey}`] = safeString(value);
                 }
               }
+              paramsRaw[`variables.${key}.${i}`] = va.name;
+              params[`variables.${key}.${i}`] = safeString(va.name);
             }
           });
         }
